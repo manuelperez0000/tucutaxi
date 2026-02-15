@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import Navbar from '../components/Navbar';
 import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow } from 'react-icons/fa';
@@ -157,21 +157,61 @@ const Drive = ({ user }) => {
         );
     };
 
-    // Simulación del movimiento del coche
-    const startCarAnimation = (routePoints) => {
+    // Simulación del movimiento del coche con actualización en Firebase
+    const startCarAnimation = async (routePoints) => {
         let index = 0;
-        const speed = 100; // ms por punto, ajustar para velocidad
+        const speed = 100; // ms por punto
+        const updateInterval = 10; // Actualizar Firebase cada 10 puntos (aprox 1 segundo)
 
         if (animationRef.current) clearInterval(animationRef.current);
 
+        // Actualizar estado inicial en Firebase
+        try {
+            const tripRef = doc(db, 'taxiRequests', id);
+            await updateDoc(tripRef, { 
+                status: 'pickup_in_progress',
+                driverLocation: {
+                    latitude: routePoints[0][0],
+                    longitude: routePoints[0][1]
+                }
+            });
+        } catch (err) {
+            console.error("Error al actualizar estado inicial:", err);
+        }
+
         animationRef.current = setInterval(() => {
             if (index < routePoints.length) {
-                setCarPosition(routePoints[index]);
+                const currentPoint = routePoints[index];
+                setCarPosition(currentPoint);
+
+                // Actualizar Firebase periódicamente
+                if (index % updateInterval === 0) {
+                    const tripRef = doc(db, 'taxiRequests', id);
+                    // No esperamos la promesa para no bloquear la animación
+                    updateDoc(tripRef, {
+                        driverLocation: {
+                            latitude: currentPoint[0],
+                            longitude: currentPoint[1]
+                        }
+                    }).catch(err => console.error("Error actualizando ubicación:", err));
+                }
+
                 index++;
             } else {
                 clearInterval(animationRef.current);
-                alert("¡Has llegado al punto de recogida!");
-                setIsNavigating(false);
+                
+                // Actualizar estado final en Firebase
+                const tripRef = doc(db, 'taxiRequests', id);
+                updateDoc(tripRef, { 
+                    status: 'driver_arrived',
+                    driverLocation: {
+                        latitude: routePoints[routePoints.length - 1][0],
+                        longitude: routePoints[routePoints.length - 1][1]
+                    }
+                }).then(() => {
+                    alert("¡Has llegado al punto de recogida!");
+                    setIsNavigating(false);
+                }).catch(err => console.error("Error al finalizar viaje:", err));
             }
         }, speed);
     };
