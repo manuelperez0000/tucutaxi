@@ -98,12 +98,12 @@ const Profile = ({ user }) => {
     <div className="min-vh-100 bg-light">
       <Navbar user={user} />
       
-      <main className="container py-5">
+      <main className="container py-4">
         <div className="row justify-content-center">
           <div className="col-12 col-md-8 col-lg-6">
             <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
-              <div className="bg-dark p-4 text-center text-white">
-                <div className="position-relative d-inline-block mb-3">
+              <div className="bg-dark p-3 text-center text-white">
+                <div className="position-relative d-inline-block mb-2">
                   {user?.photoURL ? (
                     <img 
                       src={user.photoURL} 

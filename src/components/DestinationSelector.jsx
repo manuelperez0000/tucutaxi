@@ -83,6 +83,7 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
   };
 
   const handleConfirm = () => {
+    
     if (destination && destinationAddress) {
       onDestinationSelected({
         location: destination,

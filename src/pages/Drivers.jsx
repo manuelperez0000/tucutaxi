@@ -100,10 +100,9 @@ const Drivers = ({ user }) => {
     }
   };
 
-  const handleViewLocation = (latitude, longitude) => {
-    // Abrir Google Maps con las coordenadas
-    const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
-    window.open(url, '_blank');
+  const handleViewLocation = (requestId) => {
+    // Navegar a la página de detalle del viaje
+    navigate(`/drive/${requestId}`);
   };
 
   return (
@@ -180,7 +179,7 @@ const Drivers = ({ user }) => {
                       <div className="d-grid gap-2 mt-auto">
                         <button 
                           className="btn btn-outline-primary py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
-                          onClick={() => handleViewLocation(request.location?.latitude, request.location?.longitude)}
+                          onClick={() => handleViewLocation(request.id)}
                           style={{ borderRadius: '12px' }}
                         >
                           <FaMapMarkerAlt /> Ver Mapa
