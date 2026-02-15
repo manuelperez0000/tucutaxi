@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import LocationSelector from '../components/LocationSelector';
-import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt, FaCar } from 'react-icons/fa';
 import useDashboard from '../hooks/useDashboadr';
 
 const Dashboard = ({ user }) => {
@@ -233,16 +233,24 @@ const Dashboard = ({ user }) => {
                       </div>
                     ) : (
                       <div className="text-start">
-                        {activeTrip.driverArrived && (
+                        {activeTrip.status === 'in_progress' ? (
+                          <div className="alert alert-primary border-0 rounded-4 text-center py-3 mb-3 shadow-sm animate__animated animate__pulse animate__infinite">
+                            <h5 className="fw-bold mb-1"><FaCar className="me-2" /> En Viaje</h5>
+                            <small>Rumbo a tu destino.</small>
+                          </div>
+                        ) : activeTrip.driverArrived ? (
                           <div className="alert alert-success border-0 rounded-4 text-center py-3 mb-3 shadow-sm animate__animated animate__pulse animate__infinite">
                             <h5 className="fw-bold mb-1"><FaMapMarkerAlt className="me-2" /> ¡Tu conductor ha llegado!</h5>
                             <small>Por favor, acércate al punto de recogida.</small>
                           </div>
-                        )}
+                        ) : null}
 
                         <div className="d-flex align-items-center gap-2 mb-3 justify-content-center text-success">
                           <FaTaxi />
-                          <span className="fw-bold">{activeTrip.driverArrived ? 'Esperándote en el punto' : 'Conductor en camino'}</span>
+                          <span className="fw-bold">
+                            {activeTrip.status === 'in_progress' ? 'Viaje en curso' : 
+                             activeTrip.driverArrived ? 'Esperándote en el punto' : 'Conductor en camino'}
+                          </span>
                         </div>
 
 
