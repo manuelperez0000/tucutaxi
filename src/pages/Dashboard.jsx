@@ -1,6 +1,7 @@
 
+import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import DestinationSelector from '../components/DestinationSelector';
+import LocationSelector from '../components/LocationSelector';
 import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt } from 'react-icons/fa';
 import useDashboard from '../hooks/useDashboadr';
 
@@ -13,22 +14,42 @@ const Dashboard = ({ user }) => {
     setShowDestinationSelector,
     destination,
     setDestination,
-    requestMode,
-    setRequestMode,
     userLocation,
     handleCancelTrip,
     handleRequestTaxi,
     handleViewDriverLocation,
     handleAcceptOffer,
-    handleDeclineOffer
+    handleDeclineOffer,
+    pickupLocation,
+    setPickupLocation
   } = useDashboard({ user });
+
+  const [selectionStep, setSelectionStep] = useState('idle'); // 'idle', 'pickup', 'destination'
+
+  // Si el hook pide mostrar el selector (por validación fallida), iniciamos el flujo
+  useEffect(() => {
+    if (showDestinationSelector) {
+        setSelectionStep('pickup');
+        setShowDestinationSelector(false);
+    }
+  }, [showDestinationSelector, setShowDestinationSelector]);
+
+  const handlePickupSelected = (location) => {
+      setPickupLocation(location);
+      setSelectionStep('destination');
+  };
+
+  const handleDestinationSelected = (location) => {
+      setDestination(location);
+      setSelectionStep('idle');
+  };
 
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' }}>
       <Navbar user={user} />
 
       <main className="container-fluid mt-auto d-flex flex-column align-items-center p-0">
-        <div className="card border-0 shadow-lg text-center p-4 w-100" style={{ borderRadius: '30px 30px 0 0', backgroundColor: 'rgba(255, 255, 255, 1)' }}>
+        <div className="card2 border-0 shadow-lg text-center p-4 w-100" style={{ borderRadius: '30px 30px 0 0', backgroundColor: 'rgba(255, 246, 246, 0.72)' }}>
 
           <div className="container-md">
             {message.text && (
@@ -43,122 +64,122 @@ const Dashboard = ({ user }) => {
                   <>
                     <p className="text-muted mb-4 text-start text-md-center">¿A dónde quieres ir hoy?</p>
 
-                    {!requestMode ? (
-                      <div className="d-grid gap-3 mb-3">
+                    <div className="animate__animated animate__fadeIn">
+                      {/* Botón inicial para comenzar el flujo de selección */}
+                      {!destination && selectionStep === 'idle' && (
                         <button
-                          className="btn btn-light btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
-                          onClick={() => setRequestMode('current')}
-                          style={{ borderRadius: '15px', border: '1px solid #eee' }}
+                          className="btn btn-outline-dark btn-lg py-3 fw-bold d-flex align-items-center justify-content-center gap-2 w-100 mb-3"
+                          onClick={() => setSelectionStep('pickup')}
+                          style={{ borderRadius: '15px', borderStyle: 'dashed' }}
                         >
-                          <FaMapMarkerAlt className="text-primary" />
-                          Pedir un taxi a mi dirección
+                          <FaMapMarkedAlt />
+                          Seleccionar Destino
                         </button>
-                        <button
-                          className="btn btn-light btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
-                          onClick={() => setRequestMode('other')}
-                          style={{ borderRadius: '15px', border: '1px solid #eee' }}
-                        >
-                          <FaMapMarkedAlt className="text-warning" />
-                          Pedir un taxi a otra dirección
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="animate__animated animate__fadeIn">
-                        {requestMode === 'other' && !destination && !showDestinationSelector && (
-                          <button
-                            className="btn btn-outline-dark btn-lg py-3 fw-bold d-flex align-items-center justify-content-center gap-2 w-100 mb-3"
-                            onClick={() => setShowDestinationSelector(true)}
-                            style={{ borderRadius: '15px', borderStyle: 'dashed' }}
-                          >
-                            <FaMapMarkedAlt />
-                            Seleccionar Destino
-                          </button>
-                        )}
+                      )}
 
-                        {showDestinationSelector && (
-                          <div className="mb-3 animate__animated animate__slideInUp">
-                            <div className="d-flex align-items-center justify-content-between mb-2">
-                              <h6 className="fw-bold mb-0">Elige tu destino</h6>
-                              <button className="btn btn-sm btn-close" onClick={() => setShowDestinationSelector(false)}></button>
-                            </div>
-                            <DestinationSelector
-                              userLocation={userLocation}
-                              onDestinationSelected={(dest) => {
-                                setDestination(dest);
-                                setShowDestinationSelector(false);
-                              }}
-                            />
+                      {/* Paso 1: Selección de Ubicación Actual (Pickup) */}
+                      {selectionStep === 'pickup' && (
+                        <div className="mb-3 animate__animated animate__slideInUp">
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <h6 className="fw-bold mb-0">Confirma tu ubicación de recogida</h6>
+                            <button className="btn btn-sm btn-close" onClick={() => setSelectionStep('idle')}></button>
                           </div>
-                        )}
-
-                        {((requestMode === 'current') || (requestMode === 'other' && destination)) && (
-                          <div className="card border-0 shadow-sm mb-3 text-start" style={{ borderRadius: '15px', backgroundColor: '#f8f9fa' }}>
-                            <div className="card-body p-3">
-                              <div className="d-flex justify-content-between align-items-start mb-2">
-                                <span className="badge bg-dark-subtle text-dark text-uppercase px-2 py-1" style={{ fontSize: '0.7rem' }}>
-                                  Información del Viaje
-                                </span>
-                                <button 
-                                  className="btn btn-sm btn-link text-danger p-0 text-decoration-none fw-bold"
-                                  onClick={() => {
-                                    setRequestMode(null);
-                                    setDestination(null);
-                                    setShowDestinationSelector(false);
-                                  }}
-                                  style={{ fontSize: '0.8rem' }}
-                                >
-                                  <FaTimes className="me-1" /> Cambiar
-                                </button>
-                              </div>
-                              
-                              <div className="d-flex align-items-center gap-3">
-                                <div className="bg-white p-2 rounded-circle shadow-sm">
-                                  {requestMode === 'current' ? (
-                                    <FaMapMarkerAlt className="text-primary fs-5" />
-                                  ) : (
-                                    <FaMapMarkedAlt className="text-warning fs-5" />
-                                  )}
-                                </div>
-                                <div>
-                                  <p className="small text-muted mb-0">Destino seleccionado:</p>
-                                  <p className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
-                                    {requestMode === 'current' ? 'Mi ubicación actual' : destination?.address}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="d-grid gap-2">
-                          <button
-                            className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
-                            onClick={handleRequestTaxi}
-                            disabled={loading || (requestMode === 'other' && !destination)}
-                            style={{ borderRadius: '15px' }}
-                          >
-                            {loading ? (
-                              <FaSpinner className="spinner-border spinner-border-sm border-0" />
-                            ) : (
-                              <FaTaxi />
-                            )}
-                            {loading ? 'Procesando...' : 'Confirmar y Pedir Taxi'}
-                          </button>
-                          
-                          {!loading && (
-                            <button 
-                              className="btn btn-link text-muted btn-sm text-decoration-none"
-                              onClick={() => {
-                                setRequestMode(null);
-                                setDestination(null);
-                              }}
-                            >
-                              Volver atrás
-                            </button>
-                          )}
+                          <LocationSelector
+                            initialLocation={pickupLocation || userLocation}
+                            onLocationSelected={handlePickupSelected}
+                            title="¿Dónde te buscamos?"
+                            placeholder="Buscar dirección de recogida..."
+                            confirmText="Confirmar Recogida"
+                            confirmButtonColor="btn-dark"
+                            iconColorClass="text-primary"
+                          />
                         </div>
+                      )}
+
+                      {/* Paso 2: Selección de Destino */}
+                      {selectionStep === 'destination' && (
+                        <div className="mb-3 animate__animated animate__slideInUp">
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <h6 className="fw-bold mb-0">Elige tu destino</h6>
+                            <button className="btn btn-sm btn-close" onClick={() => setSelectionStep('pickup')}></button>
+                          </div>
+                          <LocationSelector
+                            initialLocation={destination || userLocation} // O userLocation como centro por defecto
+                            onLocationSelected={handleDestinationSelected}
+                            title="¿A dónde vas?"
+                            placeholder="Buscar destino..."
+                            confirmText="Confirmar Destino"
+                            confirmButtonColor="btn-warning"
+                            iconColorClass="text-danger"
+                          />
+                        </div>
+                      )}
+
+                      {/* Resumen del viaje (cuando ambos están seleccionados y estamos en idle) */}
+                      {destination && pickupLocation && selectionStep === 'idle' && (
+                        <div className="card border-0 shadow-sm mb-3 text-start" style={{ borderRadius: '15px', backgroundColor: '#f8f9fa' }}>
+                          <div className="card-body p-3">
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <span className="badge bg-dark-subtle text-dark text-uppercase px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                Información del Viaje
+                              </span>
+                              <button 
+                                className="btn btn-sm btn-link text-danger p-0 text-decoration-none fw-bold"
+                                onClick={() => {
+                                  setDestination(null);
+                                  setSelectionStep('pickup'); // Reiniciar flujo
+                                }}
+                                style={{ fontSize: '0.8rem' }}
+                              >
+                                <FaTimes className="me-1" /> Cambiar
+                              </button>
+                            </div>
+                            
+                            {/* Pickup Info */}
+                            <div className="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                              <div className="bg-white p-2 rounded-circle shadow-sm">
+                                <FaMapMarkerAlt className="text-primary fs-5" />
+                              </div>
+                              <div>
+                                <p className="small text-muted mb-0">Recogida:</p>
+                                <p className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
+                                  {pickupLocation?.address || 'Ubicación actual'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Destination Info */}
+                            <div className="d-flex align-items-center gap-3">
+                              <div className="bg-white p-2 rounded-circle shadow-sm">
+                                <FaMapMarkedAlt className="text-warning fs-5" />
+                              </div>
+                              <div>
+                                <p className="small text-muted mb-0">Destino:</p>
+                                <p className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
+                                  {destination?.address}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="d-grid gap-2">
+                        <button
+                          className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
+                          onClick={handleRequestTaxi}
+                          disabled={loading || !destination || !pickupLocation || selectionStep !== 'idle'}
+                          style={{ borderRadius: '15px' }}
+                        >
+                          {loading ? (
+                            <FaSpinner className="spinner-border spinner-border-sm border-0" />
+                          ) : (
+                            <FaTaxi />
+                          )}
+                          {loading ? 'Procesando...' : 'Confirmar y Pedir Taxi'}
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </>
                 ) : (
                   <div className="bg-light p-3 rounded-4 shadow-sm border mt-2">

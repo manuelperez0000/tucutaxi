@@ -51,12 +51,36 @@ const reverseGeocode = async (lat, lng, setAddress) => {
   }
 };
 
-const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
-  const [destination, setDestination] = useState(null);
-  const [destinationAddress, setDestinationAddress] = useState('');
+const LocationSelector = ({ 
+    onLocationSelected, 
+    initialLocation, 
+    title = "Seleccionar Ubicación",
+    placeholder = "Buscar dirección...",
+    confirmText = "Confirmar Ubicación",
+    confirmButtonColor = "btn-dark",
+    iconColorClass = "text-danger"
+}) => {
+  const [selectedPos, setSelectedPos] = useState(initialLocation ? { lat: initialLocation.lat, lng: initialLocation.lng } : null);
+  const [address, setAddress] = useState(initialLocation?.address || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [mapCenter, setMapCenter] = useState(userLocation || { lat: -34.6037, lng: -58.3816 }); // Default to BA if no location
+  // Default center: Tucuman or initialLocation
+  const [mapCenter, setMapCenter] = useState(initialLocation ? { lat: initialLocation.lat, lng: initialLocation.lng } : { lat: -26.829, lng: -65.217 });
+
+  useEffect(() => {
+      // If initialLocation changes (e.g. GPS found), update the map
+      if (initialLocation) {
+          const newPos = { lat: initialLocation.lat, lng: initialLocation.lng };
+          setSelectedPos(newPos);
+          setMapCenter(newPos);
+          if (initialLocation.address) {
+              setAddress(initialLocation.address);
+          } else {
+              // Try to reverse geocode if address is missing but we have coords
+              reverseGeocode(newPos.lat, newPos.lng, setAddress);
+          }
+      }
+  }, [initialLocation]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -69,8 +93,8 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
       if (data && data.length > 0) {
         const { lat, lon, display_name } = data[0];
         const newPos = { lat: parseFloat(lat), lng: parseFloat(lon) };
-        setDestination(newPos);
-        setDestinationAddress(display_name);
+        setSelectedPos(newPos);
+        setAddress(display_name);
         setMapCenter(newPos);
       } else {
         alert("No se encontró la ubicación");
@@ -83,17 +107,18 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
   };
 
   const handleConfirm = () => {
-    
-    if (destination && destinationAddress) {
-      onDestinationSelected({
-        location: destination,
-        address: destinationAddress
+    if (selectedPos) {
+      onLocationSelected({
+        lat: selectedPos.lat,
+        lng: selectedPos.lng,
+        address: address || 'Ubicación seleccionada'
       });
     }
   };
 
   return (
-    <div className="destination-selector mt-3">
+    <div className="destination-selector mt-2">
+      <h6 className="fw-bold mb-2 px-1">{title}</h6>
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div className="card-body p-0">
           <div className="p-3 bg-white border-bottom">
@@ -101,7 +126,7 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
               <input
                 type="text"
                 className="form-control border-end-0 rounded-start-pill ps-4"
-                placeholder="Escribe tu destino..."
+                placeholder={placeholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ height: '50px' }}
@@ -114,10 +139,10 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
                 {searching ? <div className="spinner-border spinner-border-sm" /> : <FaSearch />}
               </button>
             </form>
-            {destinationAddress && (
+            {address && (
               <div className="d-flex align-items-center gap-2 px-2 py-1">
-                <FaMapMarkerAlt className="text-danger flex-shrink-0" />
-                <small className="text-muted text-truncate">{destinationAddress}</small>
+                <FaMapMarkerAlt className={`${iconColorClass} flex-shrink-0`} />
+                <small className="text-muted text-truncate">{address}</small>
               </div>
             )}
           </div>
@@ -125,7 +150,7 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
           <div style={{ height: '300px', width: '100%' }}>
             <MapContainer 
               center={[mapCenter.lat, mapCenter.lng]} 
-              zoom={13} 
+              zoom={15} 
               style={{ height: '100%', width: '100%' }}
             >
               <TileLayer
@@ -133,9 +158,9 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
               <LocationMarker 
-                position={destination} 
-                setPosition={setDestination} 
-                setAddress={setDestinationAddress} 
+                position={selectedPos} 
+                setPosition={setSelectedPos} 
+                setAddress={setAddress} 
               />
               <MapUpdater center={mapCenter} />
             </MapContainer>
@@ -143,11 +168,11 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
 
           <div className="p-3 bg-light">
             <button
-              className="btn btn-dark w-100 py-3 fw-bold rounded-pill"
+              className={`btn ${confirmButtonColor} w-100 py-3 fw-bold rounded-pill`}
               onClick={handleConfirm}
-              disabled={!destination}
+              disabled={!selectedPos}
             >
-              Confirmar Destino
+              {confirmText}
             </button>
           </div>
         </div>
@@ -156,4 +181,4 @@ const DestinationSelector = ({ onDestinationSelected, userLocation }) => {
   );
 };
 
-export default DestinationSelector;
+export default LocationSelector;

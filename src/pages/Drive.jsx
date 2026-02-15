@@ -49,7 +49,7 @@ const Drive = ({ user }) => {
     const [isNavigating, setIsNavigating] = useState(false);
     const [carPosition, setCarPosition] = useState(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
-    const animationRef = useRef(null);
+    const watchIdRef = useRef(null);
 
     useEffect(() => {
         const fetchTrip = async () => {
@@ -81,7 +81,7 @@ const Drive = ({ user }) => {
         setCarPosition([startLat, startLng]);
 
         try {
-            // Llamada a OSRM
+            // Llamada a OSRM para dibujar la ruta inicial
             const response = await fetch(
                 `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`
             );
@@ -93,9 +93,11 @@ const Drive = ({ user }) => {
                 setRoute(coordinates);
                 setIsNavigating(true);
                 setIsMinimized(true); // Minimizar tarjeta automáticamente al iniciar
-                startCarAnimation(coordinates);
+                
+                // Iniciar seguimiento en tiempo real
+                startRealtimeTracking(endLat, endLng);
             } else {
-                alert("No se pudo calcular la ruta.");
+                alert("No se pudo calcular la ruta inicial.");
             }
         } catch (error) {
             console.error("Error al obtener ruta:", error);
@@ -130,96 +132,89 @@ const Drive = ({ user }) => {
             }, 
             (error) => {
                 setLoadingLocation(false);
-                console.warn("Fallo geolocalización real, usando simulación:", error);
+                console.error("Error al obtener ubicación:", error);
                 
-                // Fallback a ubicación simulada para demostración/desarrollo
-                // Simulamos estar un poco al sur y al oeste del destino (aprox 1km)
-                const mockStartLat = trip.location.latitude - 0.008; 
-                const mockStartLng = trip.location.longitude - 0.008;
-
-                let errorMsg = "No se pudo obtener tu ubicación real.";
+                let errorMsg = "No se pudo obtener tu ubicación actual.";
+                
+                // Manejo detallado de errores
                 if (error.code === error.PERMISSION_DENIED) {
-                    errorMsg = "Permiso de ubicación denegado.";
+                    errorMsg = "Permiso de ubicación denegado. Por favor, habilita el acceso a la ubicación en tu navegador.";
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    errorMsg = "La información de ubicación no está disponible.";
                 } else if (error.code === error.TIMEOUT) {
-                    errorMsg = "Tiempo de espera agotado.";
+                    errorMsg = "Se agotó el tiempo de espera para obtener la ubicación.";
                 }
 
-                alert(`${errorMsg} Se usará una ubicación simulada para la demostración.`);
-                
-                fetchAndStartRoute(
-                    mockStartLat,
-                    mockStartLng,
-                    trip.location.latitude,
-                    trip.location.longitude
-                );
+                alert(errorMsg);
             }, 
             options
         );
     };
-
-    // Simulación del movimiento del coche con actualización en Firebase
-    const startCarAnimation = async (routePoints) => {
-        let index = 0;
-        const speed = 100; // ms por punto
-        const updateInterval = 10; // Actualizar Firebase cada 10 puntos (aprox 1 segundo)
-
-        if (animationRef.current) clearInterval(animationRef.current);
-
-        // Actualizar estado inicial en Firebase
-        try {
-            const tripRef = doc(db, 'taxiRequests', id);
-            await updateDoc(tripRef, { 
-                status: 'pickup_in_progress',
-                driverLocation: {
-                    latitude: routePoints[0][0],
-                    longitude: routePoints[0][1]
-                }
-            });
-        } catch (err) {
-            console.error("Error al actualizar estado inicial:", err);
+    const startRealtimeTracking = (destLat, destLng) => {
+        if (!navigator.geolocation) {
+             console.error("Geolocalización no soportada");
+             return;
         }
 
-        animationRef.current = setInterval(() => {
-            if (index < routePoints.length) {
-                const currentPoint = routePoints[index];
-                setCarPosition(currentPoint);
+        // Limpiar cualquier watch anterior
+        if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
 
-                // Actualizar Firebase periódicamente
-                if (index % updateInterval === 0) {
-                    const tripRef = doc(db, 'taxiRequests', id);
-                    // No esperamos la promesa para no bloquear la animación
-                    updateDoc(tripRef, {
-                        driverLocation: {
-                            latitude: currentPoint[0],
-                            longitude: currentPoint[1]
-                        }
-                    }).catch(err => console.error("Error actualizando ubicación:", err));
-                }
-
-                index++;
-            } else {
-                clearInterval(animationRef.current);
-                
-                // Actualizar estado final en Firebase
+        // Actualizar estado inicial en Firebase
+        const updateFirebaseLocation = async (lat, lng, status = 'pickup_in_progress') => {
+             try {
                 const tripRef = doc(db, 'taxiRequests', id);
-                updateDoc(tripRef, { 
-                    status: 'driver_arrived',
-                    driverLocation: {
-                        latitude: routePoints[routePoints.length - 1][0],
-                        longitude: routePoints[routePoints.length - 1][1]
+                await updateDoc(tripRef, { 
+                    driverLocation: { latitude: lat, longitude: lng },
+                    status: status
+                });
+             } catch (err) { console.error("Error actualizando Firebase:", err); }
+        };
+
+        const options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        const id_geo = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setCarPosition([latitude, longitude]);
+                
+                // Calcular distancia al destino (fórmula simple para distancias cortas)
+                // Usando Haversine simplificado o distancia euclidiana aproximada
+                // 1 grado de latitud ~ 111km. 0.0005 grados ~ 55 metros
+                const latDiff = latitude - destLat;
+                const lngDiff = longitude - destLng;
+                const distanceSquared = (latDiff * latDiff) + (lngDiff * lngDiff);
+                
+                // Umbral de llegada: aprox 50-100 metros (0.0005^2 + 0.0005^2 = 0.0000005)
+                const arrivalThreshold = 0.000001; 
+
+                if (distanceSquared < arrivalThreshold) {
+                    // Llegada
+                    updateFirebaseLocation(latitude, longitude, 'driver_arrived');
+                    if (watchIdRef.current !== null) {
+                        navigator.geolocation.clearWatch(watchIdRef.current);
+                        watchIdRef.current = null;
                     }
-                }).then(() => {
-                    alert("¡Has llegado al punto de recogida!");
                     setIsNavigating(false);
-                }).catch(err => console.error("Error al finalizar viaje:", err));
-            }
-        }, speed);
+                    alert("¡Has llegado al punto de recogida!");
+                } else {
+                    // En camino
+                    updateFirebaseLocation(latitude, longitude);
+                }
+            },
+            (error) => console.error("Error en watchPosition:", error),
+            options
+        );
+        watchIdRef.current = id_geo;
     };
 
-    // Limpiar intervalo al desmontar
+    // Limpiar watch al desmontar
     useEffect(() => {
         return () => {
-            if (animationRef.current) clearInterval(animationRef.current);
+            if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
         };
     }, []);
 

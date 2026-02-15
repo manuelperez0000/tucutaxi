@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fa';
 import { 
   signInWithRedirect, 
+  signInWithPopup,
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   updateProfile 
@@ -46,7 +47,8 @@ const Home = ({ user }) => {
     setLoading(true);
     setError(null);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
+      // La navegación a /dashboard ocurrirá automáticamente gracias al useEffect que escucha 'user'
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
       setError("Error al conectar con Google.");

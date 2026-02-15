@@ -11,21 +11,39 @@ const useDashboard = ({user}) => {
     const [showDestinationSelector, setShowDestinationSelector] = useState(false);
     const [destination, setDestination] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
+    const [pickupLocation, setPickupLocation] = useState(null);
 
+
+    // Ubicación por defecto (Plaza Independencia, San Miguel de Tucumán)
+    const DEFAULT_LOCATION = {
+        lat: -26.829,
+        lng: -65.217,
+        address: 'Plaza Independencia, San Miguel de Tucumán (Simulado)'
+    };
 
     // Obtener ubicación inicial del usuario
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    setUserLocation({
+                    const loc = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
-                    });
+                    };
+                    setUserLocation(loc);
+                    setPickupLocation(loc);
                 },
-                (error) => console.error("Error al obtener ubicación inicial:", error),
+                (error) => {
+                    console.error("Error al obtener ubicación inicial:", error);
+                    // Si falla, usar ubicación por defecto pero sin notificar agresivamente al inicio
+                    setUserLocation(DEFAULT_LOCATION);
+                    setPickupLocation(DEFAULT_LOCATION);
+                },
                 { enableHighAccuracy: true }
             );
+        } else {
+            setUserLocation(DEFAULT_LOCATION);
+            setPickupLocation(DEFAULT_LOCATION);
         }
     }, []);
 
@@ -114,90 +132,80 @@ const useDashboard = ({user}) => {
     };
 
     const handleRequestTaxi = () => {
-        if (!destination) {
+        if (!destination || !pickupLocation) {
             setShowDestinationSelector(true);
-            return;
-        }
-
-        if (!navigator.geolocation) {
-            setMessage({ type: 'danger', text: 'Tu navegador no soporta geolocalización.' });
             return;
         }
 
         setLoading(true);
         setMessage({ type: '', text: '' });
 
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                try {
-                    const { latitude, longitude } = position.coords;
-
-                    // Obtener dirección legible usando OpenStreetMap (Nominatim)
-                    let address = 'Ubicación desconocida';
+        // Función auxiliar para procesar la solicitud con coordenadas
+        const processRequest = async (lat, lng, addressText = null) => {
+            try {
+                let address = addressText;
+                
+                // Si no tenemos dirección, intentamos geocodificar
+                if (!address) {
                     try {
-                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
                         const data = await response.json();
                         address = data.display_name || 'Ubicación sin nombre';
                     } catch (err) {
                         console.error("Error al obtener dirección:", err);
+                        address = 'Ubicación seleccionada (Manual)';
                     }
-
-                    const tripId = generateTripId();
-
-                   
-                    // Crear la solicitud en Firestore
-                    const requestData = {
-                        userId: user.uid,
-                        userName: user.displayName,
-                        userEmail: user.email,
-                        userPhoto: user.photoURL,
-                        tripId: tripId,
-                        location: {
-                            latitude,
-                            longitude
-                        },
-                        address: address,
-                        destination: {
-                            latitude: destination.location.lat,
-                            longitude: destination.location.lng,
-                            address: destination.address
-                        },
-                        status: 'pending',
-                        createdAt: serverTimestamp()
-                    };
-
-                    await addDoc(collection(db, 'taxiRequests'), requestData);
-
-                    setMessage({ type: 'success', text: '¡Buscando tu taxi!' });
-                    setShowDestinationSelector(false);
-                    setDestination(null);
-                    
-                } catch (error) {
-                    console.error("Error al guardar en Firebase:", error);
-                    setMessage({ type: 'danger', text: 'Error al enviar la solicitud. Intenta de nuevo.' });
-                } finally {
-                    setLoading(false);
                 }
-            },
-            (error) => {
+
+                const tripId = generateTripId();
+
+                // Crear la solicitud en Firestore
+                const requestData = {
+                    userId: user.uid,
+                    userName: user.displayName || 'Usuario',
+                    userEmail: user.email || '',
+                    userPhoto: user.photoURL || '',
+                    tripId: tripId,
+                    location: {
+                        latitude: lat,
+                        longitude: lng
+                    },
+                    address: address, 
+                    destination: {
+                        latitude: destination.lat,
+                        longitude: destination.lng,
+                        address: destination.address
+                    },
+                    status: 'pending',
+                    createdAt: serverTimestamp()
+                };
+
+                await addDoc(collection(db, 'taxiRequests'), requestData);
+
+                setMessage({ type: 'success', text: '¡Buscando tu taxi!' });
+                setShowDestinationSelector(false);
+                setDestination(null);
+                // No reseteamos pickupLocation, la dejamos por si quiere pedir otro
+                
+            } catch (error) {
+                console.error("Error al guardar en Firebase:", error);
+                setMessage({ type: 'danger', text: 'Error al enviar la solicitud. Intenta de nuevo.' });
+            } finally {
                 setLoading(false);
-                console.error("Error de geolocalización:", error);
-                switch (error.code) {
-                    case error.PERMISSION_DENIED:
-                        setMessage({ type: 'danger', text: 'Debes permitir el acceso al GPS para pedir un taxi.' });
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        setMessage({ type: 'danger', text: 'La ubicación no está disponible.' });
-                        break;
-                    case error.TIMEOUT:
-                        setMessage({ type: 'danger', text: 'Se agotó el tiempo para obtener la ubicación.' });
-                        break;
-                    default:
-                        setMessage({ type: 'danger', text: 'Ocurrió un error al obtener tu ubicación.' });
-                }
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+            }
+        };
+
+        // Si tenemos una ubicación de recogida explícita, la usamos
+        if (pickupLocation) {
+             processRequest(pickupLocation.lat, pickupLocation.lng, pickupLocation.address);
+        } else {
+             // Fallback a lógica anterior (aunque ahora pickupLocation debería estar siempre)
+             if (!navigator.geolocation) {
+                 processRequest(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng, DEFAULT_LOCATION.address);
+                 return;
+             }
+             // ... resto de lógica si hiciera falta ...
+        }
     };
 
     const handleCancelTrip = async () => {
@@ -280,7 +288,9 @@ const useDashboard = ({user}) => {
         handleViewDriverLocation,
         handleAcceptOffer,
         handleDeclineOffer,
-        setDestination
+        setDestination,
+        pickupLocation,
+        setPickupLocation
     }
 
 }
