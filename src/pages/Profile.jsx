@@ -95,7 +95,7 @@ const Profile = ({ user }) => {
   }
 
   return (
-    <div className="min-vh-100 bg-light">
+    <div className="min-vh-100">
       <Navbar user={user} />
       
       <main className="container py-4">

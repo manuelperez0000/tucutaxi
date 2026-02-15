@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from 'firebase/firestore';
-import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle } from 'react-icons/fa';
+import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle, FaCar } from 'react-icons/fa';
 
 const TripDetails = ({ user }) => {
   const { id } = useParams();
@@ -134,6 +134,17 @@ const TripDetails = ({ user }) => {
               </div>
 
               <div className="card-body p-4">
+                {/* Botón para ir al mapa en Drive */}
+                <div className="mb-4">
+                  <button 
+                    className="btn btn-primary w-100 py-3 rounded-4 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 animate__animated animate__pulse animate__infinite"
+                    onClick={() => navigate(`/drive/${trip.id}`)}
+                  >
+                    <FaCar className="fs-4" />
+                    <span>IR AL VIAJE EN CURSO (MAPA)</span>
+                  </button>
+                </div>
+
                 {trip.status === 'offered' ? (
                   <div className="text-center py-4">
                     <div className="spinner-border text-warning mb-3" role="status"></div>

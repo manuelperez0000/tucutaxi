@@ -35,6 +35,30 @@ const Drivers = ({ user }) => {
       }
 
       const pendingRequests = docs.filter(r => r.status === 'pending');
+
+      // Verificar y cancelar solicitudes antiguas (más de 1 hora)
+      const oneHourInMillis = 60 * 60 * 1000;
+      const now = new Date();
+
+      pendingRequests.forEach(async (request) => {
+        if (request.createdAt) {
+          // Manejar tanto Timestamp de Firestore como fechas JS si fuera el caso
+          const createdAtDate = request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
+          const timeDiff = now - createdAtDate;
+
+          if (timeDiff > oneHourInMillis) {
+            try {
+              await updateDoc(doc(db, 'taxiRequests', request.id), {
+                status: 'cancelled'
+              });
+              console.log(`Solicitud ${request.id} cancelada automáticamente por inactividad.`);
+            } catch (error) {
+              console.error("Error al cancelar solicitud antigua:", error);
+            }
+          }
+        }
+      });
+
       setRequests(pendingRequests);
       setLoading(false);
     });
@@ -106,7 +130,7 @@ const Drivers = ({ user }) => {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column bg-light">
+    <div className="min-vh-100 d-flex flex-column">
       <Navbar user={user} />
       
       <main className="container-fluid py-4 flex-grow-1 px-3 px-md-5">

@@ -13,6 +13,10 @@
   padding: 2rem 0;
 }
 
+.bg-cars {
+  background: linear-gradient(#fcff4fb2 0%, #ffcb6ace 100%), url('/fondo.png') no-repeat center center/cover;
+}
+
 /* Overlay para mejorar legibilidad */
 .home-hero::before {
   content: '';
@@ -33,7 +37,6 @@
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 2rem;
   max-width: 600px;
   width: 100%;
   animation: fadeIn 1s ease-out;
@@ -88,7 +91,7 @@
 }
 
 .auth-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.9);
   padding: 1.5rem 2rem;
   border-radius: 28px;
   width: 90%;

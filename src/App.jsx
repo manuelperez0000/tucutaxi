@@ -33,7 +33,9 @@ function App() {
   }
 
   return (
-    <Router user={user} />
+    <div className='bg-cars'>
+      <Router user={user} />
+    </div>
   )
 }
 

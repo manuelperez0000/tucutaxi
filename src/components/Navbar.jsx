@@ -1,7 +1,7 @@
 import React from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { FaUserCircle, FaTaxi, FaEnvelope, FaCar } from 'react-icons/fa';
+import { FaUserCircle, FaTaxi, FaEnvelope, FaCar, FaChartLine } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
 const Navbar = ({ user }) => {
@@ -20,14 +20,14 @@ const Navbar = ({ user }) => {
           <FaTaxi className="text-warning" />
           <span className="fw-bold">tucutaxi</span>
         </Link>
-        
-        <button 
-          className="navbar-toggler border-white" 
-          type="button" 
-          data-bs-toggle="collapse" 
-          data-bs-target="#navbarNav" 
-          aria-controls="navbarNav" 
-          aria-expanded="false" 
+
+        <button
+          className="navbar-toggler border-white"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
           aria-label="Toggle navigation"
         >
           <span className="navbar-toggler-icon"></span>
@@ -35,39 +35,39 @@ const Navbar = ({ user }) => {
 
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav ms-auto align-items-lg-center gap-2 pt-3 pt-lg-0">
-            <li className="nav-item">
-              <div className="d-flex align-items-center gap-2 px-2 mb-2 mb-lg-0">
+            <li className="nav-items">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/profile">
                 {user?.photoURL ? (
-                  <img 
-                    src={user.photoURL} 
-                    alt="Perfil" 
-                    className="rounded-circle" 
-                    style={{ width: '32px', height: '32px' }} 
+                  <img
+                    src={user.photoURL}
+                    alt="Perfil"
+                    className="rounded-circle mx-2"
+                    style={{ width: '28px', height: '28px' }}
                   />
                 ) : (
                   <FaUserCircle className="text-white fs-4" />
                 )}
-                <span className="text-white d-lg-none">{user?.displayName || 'Usuario'}</span>
-              </div>
+                Perfil
+              </Link>
             </li>
-            <li className="nav-item">
-              <Link className="nav-link btn btn-outline-light text-white border-0 text-start" to="/profile">
-                <FaUserCircle className="me-2" /> Perfil
+            <li className="nav-items">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/dashboard">
+                <FaChartLine className="me-2" /> Dashboard
               </Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link btn btn-outline-light text-white border-0 text-start" to="/drivers">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/drivers">
                 <FaCar className="me-2" /> Ser conductor
               </Link>
             </li>
-            <li className="nav-item">
-              <a className="nav-link btn btn-outline-light text-white border-0 text-start" href="#">
+            {/* <li className="nav-item">
+              <a className="nav-link btn btn-dark text-white border-0 text-start" href="#">
                 <FaEnvelope className="me-2" /> Contactar
               </a>
-            </li>
+            </li> */}
             <li className="nav-item mt-2 mt-lg-0">
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 className="btn btn-danger w-100 w-lg-auto"
               >
                 Cerrar Sesión

@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import Navbar from '../components/Navbar';
-import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow } from 'react-icons/fa';
+import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle } from 'react-icons/fa';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -55,6 +55,10 @@ const Drive = ({ user }) => {
     const [showPriceModal, setShowPriceModal] = useState(false);
     const [offerPrice, setOfferPrice] = useState('');
     const [sendingOffer, setSendingOffer] = useState(false);
+    
+    // Estado para notificación de pasajero aceptado
+    const [passengerAccepted, setPassengerAccepted] = useState(false);
+    const previousStatusRef = useRef(null);
 
     useEffect(() => {
         if (!id) return;
@@ -64,7 +68,17 @@ const Drive = ({ user }) => {
         
         const unsubscribe = onSnapshot(tripRef, (docSnap) => {
             if (docSnap.exists()) {
-                setTrip({ id: docSnap.id, ...docSnap.data() });
+                const data = docSnap.data();
+                
+                // Detectar cambio a 'accepted' para mostrar notificación
+                if (data.status === 'accepted' && previousStatusRef.current === 'offered') {
+                    setPassengerAccepted(true);
+                    // Ocultar notificación después de 5 segundos
+                    setTimeout(() => setPassengerAccepted(false), 5000);
+                }
+                
+                previousStatusRef.current = data.status;
+                setTrip({ id: docSnap.id, ...data });
             } else {
                 console.error("No se encontró el viaje");
                 navigate('/drivers');
@@ -351,6 +365,23 @@ const Drive = ({ user }) => {
 
     return (
         <div className="d-flex flex-column vh-100">
+            {/* Notificación de Pasajero Aceptado */}
+            {passengerAccepted && (
+                <div 
+                    className="position-absolute top-0 start-50 translate-middle-x mt-5 alert alert-success d-flex align-items-center gap-3 shadow-lg rounded-4 animate__animated animate__bounceInDown" 
+                    style={{ zIndex: 9999, width: '90%', maxWidth: '400px' }}
+                >
+                    <div className="bg-success text-white rounded-circle p-2 d-flex align-items-center justify-content-center">
+                        <FaCheckCircle className="fs-4" />
+                    </div>
+                    <div>
+                        <h6 className="fw-bold mb-0">¡Oferta Aceptada!</h6>
+                        <small className="mb-0">El pasajero ha confirmado el viaje.</small>
+                    </div>
+                    <button type="button" className="btn-close ms-auto" onClick={() => setPassengerAccepted(false)}></button>
+                </div>
+            )}
+
             <Navbar user={user} />
             
             <div className="flex-grow-1 position-relative" style={{ zIndex: 0 }}>

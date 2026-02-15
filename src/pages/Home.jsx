@@ -93,36 +93,39 @@ const Home = ({ user }) => {
   };
 
   return (
-    <div className="home-hero">
-      <div className="home-content-wrapper">
-        <header className="home-brand">
-          <div className="brand-icon-box">
-            <FaTaxi className="brand-icon" />
+    <div className="home-hero min-vh-100 d-flex align-items-center justify-content-center p-3">
+      <div className="home-content-wrapper w-100">
+        <header className="home-brand d-flex align-items-center justify-content-center gap-3 mb-4">
+          <div className="brand-icon-box bg-warning p-3 rounded-4 shadow">
+            <FaTaxi className="brand-icon fs-1 text-dark" />
           </div>
-          <h1 className="brand-name">TUCUTAXI</h1>
+          <h1 className="brand-name text-white fw-bold display-4 m-0">TUCUTAXI</h1>
         </header>
 
-        <div className="home-actions">
-          <div className="auth-card">
+        <div className="home-actions d-flex flex-column align-items-center w-100">
+          <div className="auth-card p-3 p-md-5 rounded-4 shadow-lg w-100" >
             
             {/* VISTA DE SELECCIÓN INICIAL */}
             {view === 'selection' && (
-              <div className="auth-view-content">
-                <div className="auth-header">
-                  <h2>Empieza ahora</h2>
-                  <p>Elige cómo quieres unirte a tucutaxi</p>
+              <div className="auth-view-content animate__animated animate__fadeIn">
+                <div className="auth-header text-center mb-4">
+                  <h2 className="fw-bold mb-2">Empieza ahora</h2>
+                  <p className="text-muted">Elige cómo quieres unirte a tucutaxi</p>
                 </div>
-                <div className="auth-selection">
-                  <button className="btn-selection primary" onClick={() => handleViewChange('register-email')}>
+                <div className="auth-selection d-grid gap-3">
+                  <button className="btn btn-warning btn-lg fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={() => handleViewChange('register-email')}>
                     <FaEnvelope /> Registrarse con Correo
                   </button>
-                  <button className="btn-selection" onClick={handleGoogleLogin} disabled={loading}>
-                    <FaGoogle className="google-icon-svg" /> Registrarse con Google
+                  <button className="btn btn-primary btn-lg border fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={handleGoogleLogin} disabled={loading}>
+                    <FaGoogle className="text-danger" /> Registrarse con Google
                   </button>
                   
-                  <div className="auth-divider">¿Ya tienes cuenta?</div>
+                  <div className="position-relative text-center my-3">
+                    <hr className="text-muted opacity-25" />
+                    <span className="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted small">¿Ya tienes cuenta?</span>
+                  </div>
                   
-                  <button className="btn-selection" onClick={() => handleViewChange('login-email')}>
+                  <button className="btn btn-outline-dark btn-lg fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={() => handleViewChange('login-email')}>
                     <FaLock /> Iniciar Sesión con Correo
                   </button>
                 </div>
@@ -131,47 +134,47 @@ const Home = ({ user }) => {
 
             {/* VISTA DE REGISTRO CON EMAIL */}
             {view === 'register-email' && (
-              <div className="auth-view-content">
-                <button className="btn-back" onClick={() => handleViewChange('selection')}>
+              <div className="auth-view-content animate__animated animate__fadeInRight">
+                <button className="btn btn-link text-decoration-none text-muted fw-bold mb-3 p-0 d-flex align-items-center gap-2" onClick={() => handleViewChange('selection')}>
                   <FaArrowLeft /> Volver
                 </button>
-                <div className="auth-header">
-                  <h2>Crear cuenta</h2>
-                  <p>Completa tus datos para empezar</p>
+                <div className="auth-header mb-4">
+                  <h2 className="fw-bold mb-1">Crear cuenta</h2>
+                  <p className="text-muted">Completa tus datos para empezar</p>
                 </div>
                 
-                {error && <div className="home-error">{error}</div>}
+                {error && <div className="alert alert-danger rounded-4 py-2 px-3 mb-3 small">{error}</div>}
 
-                <form className="auth-form" onSubmit={handleSubmit}>
+                <form className="auth-form d-flex flex-column gap-3" onSubmit={handleSubmit}>
                   <div className="input-group-auth">
-                    <label>Nombre completo</label>
-                    <div className="input-wrapper">
-                      <FaUser className="input-icon" />
-                      <input type="text" name="displayName" placeholder="Tu nombre" onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Nombre completo</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaUser className="text-muted" /></span>
+                      <input type="text" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="displayName" placeholder="Tu nombre" onChange={handleChange} required />
                     </div>
                   </div>
                   <div className="input-group-auth">
-                    <label>Número de teléfono</label>
-                    <div className="input-wrapper">
-                      <FaPhone className="input-icon" />
-                      <input type="tel" name="phone" placeholder="+54 9..." onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Número de teléfono</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaPhone className="text-muted" /></span>
+                      <input type="tel" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="phone" placeholder="+54 9..." onChange={handleChange} required />
                     </div>
                   </div>
                   <div className="input-group-auth">
-                    <label>Correo electrónico</label>
-                    <div className="input-wrapper">
-                      <FaEnvelope className="input-icon" />
-                      <input type="email" name="email" placeholder="ejemplo@correo.com" onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Correo electrónico</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaEnvelope className="text-muted" /></span>
+                      <input type="email" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="email" placeholder="ejemplo@correo.com" onChange={handleChange} required />
                     </div>
                   </div>
                   <div className="input-group-auth">
-                    <label>Contraseña</label>
-                    <div className="input-wrapper">
-                      <FaLock className="input-icon" />
-                      <input type="password" name="password" placeholder="••••••••" onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Contraseña</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaLock className="text-muted" /></span>
+                      <input type="password" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="password" placeholder="••••••••" onChange={handleChange} required />
                     </div>
                   </div>
-                  <button type="submit" className="btn-primary-auth" disabled={loading}>
+                  <button type="submit" className="btn btn-dark btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
                     {loading ? 'Procesando...' : (
                       <>
                         Finalizar Registro <FaChevronRight size={14} />
@@ -184,33 +187,33 @@ const Home = ({ user }) => {
 
             {/* VISTA DE LOGIN CON EMAIL */}
             {view === 'login-email' && (
-              <div className="auth-view-content">
-                <button className="btn-back" onClick={() => handleViewChange('selection')}>
+              <div className="auth-view-content animate__animated animate__fadeInRight">
+                <button className="btn btn-link text-decoration-none text-muted fw-bold mb-3 p-0 d-flex align-items-center gap-2" onClick={() => handleViewChange('selection')}>
                   <FaArrowLeft /> Volver
                 </button>
-                <div className="auth-header">
-                  <h2>Bienvenido de nuevo</h2>
-                  <p>Ingresa tus credenciales</p>
+                <div className="auth-header mb-4">
+                  <h2 className="fw-bold mb-1">Bienvenido de nuevo</h2>
+                  <p className="text-muted">Ingresa tus credenciales</p>
                 </div>
 
-                {error && <div className="home-error">{error}</div>}
+                {error && <div className="alert alert-danger rounded-4 py-2 px-3 mb-3 small">{error}</div>}
 
-                <form className="auth-form" onSubmit={handleSubmit}>
+                <form className="auth-form d-flex flex-column gap-3" onSubmit={handleSubmit}>
                   <div className="input-group-auth">
-                    <label>Correo electrónico</label>
-                    <div className="input-wrapper">
-                      <FaEnvelope className="input-icon" />
-                      <input type="email" name="email" placeholder="ejemplo@correo.com" onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Correo electrónico</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaEnvelope className="text-muted" /></span>
+                      <input type="email" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="email" placeholder="ejemplo@correo.com" onChange={handleChange} required />
                     </div>
                   </div>
                   <div className="input-group-auth">
-                    <label>Contraseña</label>
-                    <div className="input-wrapper">
-                      <FaLock className="input-icon" />
-                      <input type="password" name="password" placeholder="••••••••" onChange={handleChange} required />
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Contraseña</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaLock className="text-muted" /></span>
+                      <input type="password" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="password" placeholder="••••••••" onChange={handleChange} required />
                     </div>
                   </div>
-                  <button type="submit" className="btn-primary-auth" disabled={loading}>
+                  <button type="submit" className="btn btn-dark btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
                     {loading ? 'Iniciando...' : (
                       <>
                         Entrar <FaChevronRight size={14} />
@@ -219,8 +222,8 @@ const Home = ({ user }) => {
                   </button>
                 </form>
                 
-                <div className="auth-switch text-center mt-4">
-                  ¿No tienes cuenta? <span onClick={() => handleViewChange('register-email')}>Regístrate aquí</span>
+                <div className="text-center mt-4">
+                  <span className="text-muted">¿No tienes cuenta?</span> <button className="btn btn-link p-0 fw-bold text-decoration-none text-dark" onClick={() => handleViewChange('register-email')}>Regístrate aquí</button>
                 </div>
               </div>
             )}

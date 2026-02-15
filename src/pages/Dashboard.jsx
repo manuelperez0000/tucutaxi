@@ -45,18 +45,18 @@ const Dashboard = ({ user }) => {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column" style={{ background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' }}>
+    <div className="min-vh-100 d-flex flex-column">
       <Navbar user={user} />
 
       <main className="container-fluid mt-auto d-flex flex-column align-items-center p-0">
         <div className="card2 border-0 shadow-lg text-center p-4 w-100" style={{ borderRadius: '30px 30px 0 0', backgroundColor: 'rgba(255, 246, 246, 0.72)' }}>
 
           <div className="container-md">
-            {message.text && (
+            {/* {message.text && (
               <div className={`alert alert-${message.type} py-2 small mb-3`} role="alert">
                 {message.text}
               </div>
-            )}
+            )} */}
 
             <div className="row justify-content-center mb-3">
               <div className="col-12 col-md-8 col-lg-6">

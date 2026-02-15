@@ -221,7 +221,7 @@ const useDashboard = ({user}) => {
                 cancelledAt: serverTimestamp()
             });
             setActiveTrip(null);
-            setMessage({ type: 'success', text: 'Viaje cancelado correctamente.' });
+            setMessage({ type: 'success', text: 'Viamente.' });
         } catch (error) {
             console.error("Error al cancelar viaje:", error);
             setMessage({ type: 'danger', text: 'No se pudo cancelar el viaje.' });
