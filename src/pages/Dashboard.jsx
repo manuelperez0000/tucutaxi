@@ -48,7 +48,7 @@ const Dashboard = ({ user }) => {
     <div className="min-vh-100 d-flex flex-column">
       <Navbar user={user} />
 
-      <main className="container-fluid mt-auto d-flex flex-column align-items-center p-0">
+      <main className="container-fluid mt-auto d-flex flex-column align-items-center px-2">
         <div className="card2 border-0 shadow-lg text-center p-4 w-100" style={{ borderRadius: '30px 30px 0 0', backgroundColor: 'rgba(255, 246, 246, 0.72)' }}>
 
           <div className="container-md">
