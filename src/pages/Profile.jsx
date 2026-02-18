@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { FaUser, FaPhone, FaSave, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { FaUser, FaPhone, FaSave, FaCheckCircle, FaSpinner, FaIdCard } from 'react-icons/fa';
 
 const Profile = ({ user }) => {
   const [formData, setFormData] = useState({
     displayName: user?.displayName || '',
     phone: '',
+    dni: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +26,7 @@ const Profile = ({ user }) => {
           setFormData({
             displayName: data.displayName || user.displayName || '',
             phone: data.phone || '',
+            dni: data.dni || '',
           });
         }
       } catch (error) {
@@ -57,6 +59,7 @@ const Profile = ({ user }) => {
       const updateData = {
         displayName: formData.displayName,
         phone: formData.phone,
+        dni: formData.dni,
         email: user.email,
         photoURL: user.photoURL,
         updatedAt: serverTimestamp()
@@ -91,7 +94,7 @@ const Profile = ({ user }) => {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -105,12 +108,15 @@ const Profile = ({ user }) => {
               <div className="bg-dark p-3 text-center text-white">
                 <div className="position-relative d-inline-block mb-2">
                   {user?.photoURL ? (
+                    <> 
                     <img 
                       src={user.photoURL} 
-                      alt="Perfil" 
                       className="rounded-circle border border-4 border-warning shadow" 
                       style={{ width: '120px', height: '120px', objectFit: 'cover' }}
-                    />
+                      />
+                      
+                      </>
+                    
                   ) : (
                     <div className="bg-secondary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '120px', height: '120px' }}>
                       <FaUser className="text-white display-4" />
@@ -140,6 +146,22 @@ const Profile = ({ user }) => {
                         className="form-control bg-light border-0 py-3" 
                         placeholder="Ingresa tu nombre"
                         value={formData.displayName}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-bold text-muted small text-uppercase ls-1">Cédula de Identidad</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-0"><FaIdCard className="text-muted" /></span>
+                      <input 
+                        type="text" 
+                        name="dni"
+                        className="form-control bg-light border-0 py-3" 
+                        placeholder="Ingresa tu cédula"
+                        value={formData.dni}
                         onChange={handleChange}
                         required
                       />

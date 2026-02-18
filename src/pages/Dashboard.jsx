@@ -1,9 +1,62 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '../components/Navbar';
-import LocationSelector from '../components/LocationSelector';
-import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt, FaCar } from 'react-icons/fa';
+import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt, FaCar, FaSearch, FaIdCard } from 'react-icons/fa';
 import useDashboard from '../hooks/useDashboadr';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Polyline, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Icono de auto para el conductor
+const carIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/741/741407.png',
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -10]
+});
+
+// Componente para manejar eventos del mapa
+const MapEvents = ({ activeField, onLocationSelect }) => {
+  useMapEvents({
+    click(e) {
+      if (activeField) {
+        onLocationSelect(e.latlng);
+      }
+    },
+  });
+  return null;
+};
+
+// Componente para actualizar la vista del mapa
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.flyTo([center.lat, center.lng], map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+};
+
+// Componente para ajustar los límites del mapa a la ruta
+const RouteFitter = ({ route }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (route && route.length > 0) {
+      const bounds = L.latLngBounds(route);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [route, map]);
+  return null;
+};
 
 const Dashboard = ({ user }) => {
   const {
@@ -21,315 +74,610 @@ const Dashboard = ({ user }) => {
     handleAcceptOffer,
     handleDeclineOffer,
     pickupLocation,
-    setPickupLocation
+    setPickupLocation,
+    locationError,
+    userPhone,
+    userName,
+    userDni,
+    fetchingProfile,
+    updateUserProfile
   } = useDashboard({ user });
 
-  const [selectionStep, setSelectionStep] = useState('idle'); // 'idle', 'pickup', 'destination'
+  const [activeField, setActiveField] = useState('pickup'); // 'pickup' | 'destination' | null
+  
+  // Estado para el modal de completar perfil
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileDni, setProfileDni] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (!fetchingProfile && user) {
+        // Si no tiene teléfono o DNI, mostrar modal
+        if (!userPhone || !userDni) {
+            setShowProfileModal(true);
+            setProfileName(userName || user.displayName || '');
+            setProfilePhone(userPhone || '');
+            setProfileDni(userDni || '');
+        } else {
+            setShowProfileModal(false);
+        }
+    }
+  }, [fetchingProfile, user, userPhone, userName, userDni]);
+
+  const handleSaveProfile = async (e) => {
+      e.preventDefault();
+      if (!profileName.trim() || !profilePhone.trim() || !profileDni.trim()) {
+          alert("Por favor completa todos los campos");
+          return;
+      }
+      setSavingProfile(true);
+      const success = await updateUserProfile(profileName, profilePhone, profileDni);
+      setSavingProfile(false);
+      if (success) {
+          setShowProfileModal(false);
+      } else {
+          alert("Error al guardar perfil. Intenta de nuevo.");
+      }
+  };
+  const [mapCenter, setMapCenter] = useState({ lat: 9.05425221995597, lng: -62.05026626586915 });
+  const [addressInput, setAddressInput] = useState({ pickup: '', destination: '' });
+  const [isSearching, setIsSearching] = useState(false);
+  const [showInputs, setShowInputs] = useState(false);
+  const [route, setRoute] = useState([]);
+
+  // Función auxiliar para obtener ruta (igual que en Drive.jsx)
+  const getRoute = async (startLat, startLng, endLat, endLng) => {
+    try {
+        const response = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`
+        );
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes.length > 0) {
+            return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        }
+    } catch (error) {
+        console.error("Error al obtener ruta:", error);
+    }
+    return null;
+  };
+
+  // Efecto para calcular la ruta (ya sea viaje activo o planificación)
+  useEffect(() => {
+    const calculateRoute = async () => {
+        let startLat, startLng, endLat, endLng;
+
+        // Caso 0: Planificación (Sin viaje activo, pero con origen y destino seleccionados)
+        if (!activeTrip && pickupLocation && destination) {
+             startLat = pickupLocation.lat;
+             startLng = pickupLocation.lng;
+             endLat = destination.lat;
+             endLng = destination.lng;
+        }
+        // Caso 1: Conductor aceptó y viene a recoger (Status: accepted, driver_arrived)
+        else if (activeTrip && (activeTrip.status === 'accepted' || activeTrip.status === 'driver_arrived')) {
+             startLat = activeTrip.driverLocation?.latitude || activeTrip.driverStartLocation?.lat;
+             startLng = activeTrip.driverLocation?.longitude || activeTrip.driverStartLocation?.lng;
+             endLat = activeTrip.location?.latitude;
+             endLng = activeTrip.location?.longitude;
+        } 
+        // Caso 2: Viaje en curso hacia destino (Status: in_progress)
+        else if (activeTrip && activeTrip.status === 'in_progress') {
+             startLat = activeTrip.driverLocation?.latitude || activeTrip.location?.latitude; // Usar ubicación conductor o inicio
+             startLng = activeTrip.driverLocation?.longitude || activeTrip.location?.longitude;
+             endLat = activeTrip.destination?.latitude;
+             endLng = activeTrip.destination?.longitude;
+        }
+
+        if (startLat && startLng && endLat && endLng) {
+            const coords = await getRoute(startLat, startLng, endLat, endLng);
+            if (coords) {
+                setRoute(coords);
+            }
+        } else {
+            // Si falta algún punto o no aplica ninguno de los casos, limpiar ruta
+            // PERO: Evitar limpiar si estamos en transición rápida o si solo falta un dato momentáneamente
+            if (!activeTrip && (!pickupLocation || !destination)) {
+                 setRoute([]);
+            }
+        }
+    };
+
+    calculateRoute();
+  }, [activeTrip, activeTrip?.driverLocation, activeTrip?.status, pickupLocation, destination]);
 
   // Si el hook pide mostrar el selector (por validación fallida), iniciamos el flujo
   useEffect(() => {
     if (showDestinationSelector) {
-        setSelectionStep('pickup');
+        setShowInputs(true);
+        setActiveField('pickup');
         setShowDestinationSelector(false);
     }
   }, [showDestinationSelector, setShowDestinationSelector]);
 
-  const handlePickupSelected = (location) => {
-      setPickupLocation(location);
-      setSelectionStep('destination');
+  // Inicializar mapa con ubicación de usuario
+  useEffect(() => {
+    if (userLocation) {
+      setMapCenter(userLocation);
+      
+      // Si hay ubicación de usuario pero el pickupLocation no tiene dirección (carga inicial), obtenerla
+      if (pickupLocation && !pickupLocation.address) {
+          const fetchInitialAddress = async () => {
+              try {
+                  const { lat, lng } = userLocation;
+                  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                  const data = await response.json();
+                  const address = data.display_name || 'Ubicación actual';
+                  
+                  // Actualizar pickupLocation con la dirección para que aparezca en el input
+                  setPickupLocation({ lat, lng, address });
+              } catch (error) {
+                  console.error("Error obteniendo dirección inicial:", error);
+                  setPickupLocation({ ...userLocation, address: 'Ubicación actual' });
+              }
+          };
+          fetchInitialAddress();
+      }
+    }
+  }, [userLocation]);
+
+  // Sincronizar inputs con ubicaciones seleccionadas
+  useEffect(() => {
+    if (pickupLocation?.address) {
+      setAddressInput(prev => ({ ...prev, pickup: pickupLocation.address }));
+    }
+  }, [pickupLocation]);
+
+  useEffect(() => {
+    if (destination?.address) {
+      setAddressInput(prev => ({ ...prev, destination: destination.address }));
+    }
+  }, [destination]);
+
+  // Manejar click en el mapa
+  const handleMapClick = async (latlng) => {
+    if (!activeField) return;
+
+    const { lat, lng } = latlng;
+    
+    // Geocodificación inversa
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+      const data = await response.json();
+      const address = data.display_name || 'Ubicación seleccionada';
+      
+      const locationData = { lat, lng, address };
+
+      if (activeField === 'pickup') {
+        setPickupLocation(locationData);
+        setActiveField('destination'); // Pasar automáticamente al siguiente campo
+      } else {
+        setDestination(locationData);
+        setActiveField(null); // Terminar selección
+      }
+    } catch (err) {
+      console.error("Error al obtener dirección:", err);
+    }
   };
 
-  const handleDestinationSelected = (location) => {
-      setDestination(location);
-      setSelectionStep('idle');
+  const handleInputChange = (field, value) => {
+    setAddressInput(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Buscar dirección por texto (al presionar Enter o botón buscar)
+  const searchAddress = async (field) => {
+    const query = addressInput[field];
+    if (!query) return;
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        const newPos = { lat: parseFloat(lat), lng: parseFloat(lon), address: display_name };
+        
+        if (field === 'pickup') {
+          setPickupLocation(newPos);
+          setMapCenter(newPos);
+          setActiveField('destination');
+        } else {
+          setDestination(newPos);
+          setMapCenter(newPos);
+          setActiveField(null);
+        }
+      } else {
+        alert("Dirección no encontrada");
+      }
+    } catch (err) {
+      console.error("Error buscando dirección:", err);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column">
-      <Navbar user={user} />
+    <div className="position-relative vh-100 overflow-hidden d-flex flex-column">
+      
+      {/* Alerta de GPS/Permisos */}
+      {locationError && (
+        <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 2000, backgroundColor: 'rgba(0,0,0,0.8)' }}>
+            <div className="card text-center p-4 m-3" style={{ maxWidth: '400px', borderRadius: '20px' }}>
+                <div className="mb-3 text-warning">
+                    <FaMapMarkerAlt size={50} />
+                </div>
+                <h4 className="fw-bold mb-3">Ubicación Requerida</h4>
+                <p className="mb-4">{locationError}</p>
+                <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                    Reintentar
+                </button>
+            </div>
+        </div>
+      )}
 
-      <main className="container-fluid mt-auto d-flex flex-column align-items-center px-2">
-        <div className="card2 border-0 shadow-lg text-center p-4 w-100" style={{ borderRadius: '30px 30px 0 0', backgroundColor: 'rgba(255, 246, 246, 0.72)' }}>
+      {/* Mapa de Fondo */}
+      <div className="position-absolute top-0 start-0 w-100 h-100" style={{ zIndex: 0 }}>
+        <MapContainer 
+          center={[mapCenter.lat, mapCenter.lng]} 
+          zoom={15} 
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          <MapEvents activeField={!activeTrip ? activeField : null} onLocationSelect={handleMapClick} />
+          <MapUpdater center={mapCenter} />
 
-          <div className="container-md">
-            {/* {message.text && (
-              <div className={`alert alert-${message.type} py-2 small mb-3`} role="alert">
-                {message.text}
-              </div>
-            )} */}
+          {/* Marcadores de Selección */}
+          {!activeTrip && pickupLocation && (
+            <Marker position={[pickupLocation.lat, pickupLocation.lng]} />
+          )}
+          {!activeTrip && destination && (
+             <Marker position={[destination.lat, destination.lng]} />
+          )}
+          
+          {/* Línea entre puntos de selección 
+          {!activeTrip && pickupLocation && destination && (
+            <Polyline positions={[
+              [pickupLocation.lat, pickupLocation.lng],
+              [destination.lat, destination.lng]
+            ]} color="blue" />
+          )}*/}
 
-            <div className="row justify-content-center mb-3">
-              <div className="col-12 col-md-8 col-lg-6">
-                {!activeTrip ? (
-                  <>
-                    <p className="text-muted mb-4 text-start text-md-center">¿A dónde quieres ir hoy?</p>
 
-                    <div className="animate__animated animate__fadeIn">
-                      {/* Botón inicial para comenzar el flujo de selección */}
-                      {!destination && selectionStep === 'idle' && (
-                        <button
-                          className="btn btn-outline-dark btn-lg py-3 fw-bold d-flex align-items-center justify-content-center gap-2 w-100 mb-3"
-                          onClick={() => setSelectionStep('pickup')}
-                          style={{ borderRadius: '15px', borderStyle: 'dashed' }}
-                        >
-                          <FaMapMarkedAlt />
-                          Seleccionar Destino
-                        </button>
-                      )}
 
-                      {/* Paso 1: Selección de Ubicación Actual (Pickup) */}
-                      {selectionStep === 'pickup' && (
-                        <div className="mb-3 animate__animated animate__slideInUp">
-                          <div className="d-flex align-items-center justify-content-between mb-2">
-                            <h6 className="fw-bold mb-0">Confirma tu ubicación de recogida</h6>
-                            <button className="btn btn-sm btn-close" onClick={() => setSelectionStep('idle')}></button>
-                          </div>
-                          <LocationSelector
-                            initialLocation={pickupLocation || userLocation}
-                            onLocationSelected={handlePickupSelected}
-                            title="¿Dónde te buscamos?"
-                            placeholder="Buscar dirección de recogida..."
-                            confirmText="Confirmar Recogida"
-                            confirmButtonColor="btn-dark"
-                            iconColorClass="text-primary"
-                          />
-                        </div>
-                      )}
+          {/* Marcadores de Viaje Activo */}
+          {activeTrip && activeTrip.location && (
+             <Marker position={[activeTrip.location.latitude, activeTrip.location.longitude]} />
+          )}
+          {activeTrip && activeTrip.destination && (
+             <Marker position={[activeTrip.destination.latitude, activeTrip.destination.longitude]} />
+          )}
+          {/* {activeTrip && activeTrip.location && activeTrip.destination && (
+             <Polyline positions={[
+               [activeTrip.location.latitude, activeTrip.location.longitude],
+               [activeTrip.destination.latitude, activeTrip.destination.longitude]
+             ]} color="red" />
+          )} */}
 
-                      {/* Paso 2: Selección de Destino */}
-                      {selectionStep === 'destination' && (
-                        <div className="mb-3 animate__animated animate__slideInUp">
-                          <div className="d-flex align-items-center justify-content-between mb-2">
-                            <h6 className="fw-bold mb-0">Elige tu destino</h6>
-                            <button className="btn btn-sm btn-close" onClick={() => setSelectionStep('pickup')}></button>
-                          </div>
-                          <LocationSelector
-                            initialLocation={destination || userLocation} // O userLocation como centro por defecto
-                            onLocationSelected={handleDestinationSelected}
-                            title="¿A dónde vas?"
-                            placeholder="Buscar destino..."
-                            confirmText="Confirmar Destino"
-                            confirmButtonColor="btn-warning"
-                            iconColorClass="text-danger"
-                          />
-                        </div>
-                      )}
+          {/* Ruta calculada (Calles) */}
+          {route.length > 0 && (
+             <>
+                <Polyline positions={route} color="blue" weight={5} opacity={0.7} />
+                <RouteFitter route={route} />
+             </>
+          )}
 
-                      {/* Resumen del viaje (cuando ambos están seleccionados y estamos en idle) */}
-                      {destination && pickupLocation && selectionStep === 'idle' && (
-                        <div className="card border-0 shadow-sm mb-3 text-start" style={{ borderRadius: '15px', backgroundColor: '#f8f9fa' }}>
-                          <div className="card-body p-3">
-                            <div className="d-flex justify-content-between align-items-start mb-2">
-                              <span className="badge bg-dark-subtle text-dark text-uppercase px-2 py-1" style={{ fontSize: '0.7rem' }}>
-                                Información del Viaje
-                              </span>
-                              <button 
-                                className="btn btn-sm btn-link text-danger p-0 text-decoration-none fw-bold"
-                                onClick={() => {
-                                  setDestination(null);
-                                  setSelectionStep('pickup'); // Reiniciar flujo
-                                }}
-                                style={{ fontSize: '0.8rem' }}
-                              >
-                                <FaTimes className="me-1" /> Cambiar
-                              </button>
-                            </div>
-                            
-                            {/* Pickup Info */}
-                            <div className="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
-                              <div className="bg-white p-2 rounded-circle shadow-sm">
-                                <FaMapMarkerAlt className="text-primary fs-5" />
-                              </div>
-                              <div>
-                                <p className="small text-muted mb-0">Recogida:</p>
-                                <p className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
-                                  {pickupLocation?.address || 'Ubicación actual'}
-                                </p>
-                              </div>
-                            </div>
+          {/* Conductor en viaje activo */}
+          {activeTrip && ['accepted', 'driver_arrived', 'in_progress'].includes(activeTrip.status) && (
+            (() => {
+                const lat = activeTrip.driverLocation?.latitude || activeTrip.driverStartLocation?.lat;
+                const lng = activeTrip.driverLocation?.longitude || activeTrip.driverStartLocation?.lng;
+                
+                if (lat && lng) {
+                    return (
+                        <Marker position={[lat, lng]} icon={carIcon} zIndexOffset={1000}>
+                            <Popup>
+                                <div className="text-center">
+                                    <strong>{activeTrip.driverName || 'Conductor'}</strong><br/>
+                                    <small>{activeTrip.status === 'driver_arrived' ? '¡Ha llegado!' : 'En camino'}</small>
+                                </div>
+                            </Popup>
+                        </Marker>
+                    );
+                }
+                return null;
+            })()
+          )}
+        </MapContainer>
+      </div>
 
-                            {/* Destination Info */}
-                            <div className="d-flex align-items-center gap-3">
-                              <div className="bg-white p-2 rounded-circle shadow-sm">
-                                <FaMapMarkedAlt className="text-warning fs-5" />
-                              </div>
-                              <div>
-                                <p className="small text-muted mb-0">Destino:</p>
-                                <p className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
-                                  {destination?.address}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+      {/* Contenido UI Overlay */}
+      <div className="position-relative d-flex flex-column h-100 pointer-events-none" style={{ zIndex: 10, pointerEvents: 'none' }}>
+        <div style={{ pointerEvents: 'auto' }}>
+            <Navbar user={user} />
+        </div>
 
-                      <div className="d-grid gap-2">
-                        <button
-                          className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
-                          onClick={handleRequestTaxi}
-                          disabled={loading || !destination || !pickupLocation || selectionStep !== 'idle'}
-                          style={{ borderRadius: '15px' }}
-                        >
-                          {loading ? (
-                            <FaSpinner className="spinner-border spinner-border-sm border-0" />
-                          ) : (
-                            <FaTaxi />
-                          )}
-                          {loading ? 'Procesando...' : 'Confirmar y Pedir Taxi'}
-                        </button>
+        <main className="container-fluid mt-auto d-flex flex-column align-items-center px-2 pointer-events-none">
+          {/* Tarjeta Flotante Principal */}
+          <div 
+             className="card border-0 shadow-lg text-center p-4 w-100 pointer-events-auto" 
+             style={{ 
+               borderRadius: '30px 30px 0 0', 
+               backgroundColor: 'rgba(255, 255, 255, 0.95)',
+               maxWidth: '600px',
+               pointerEvents: 'auto'
+             }}
+           >
+             {!activeTrip ? (
+                 <div className="animate__animated animate__fadeInUp">
+                   
+                   {!showInputs ? (
+                      <div className="d-grid gap-3">
+                          <h5 className="mb-2 fw-bold text-dark">¿A dónde quieres ir hoy?</h5>
+                          <button 
+                             className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100 rounded-4"
+                             onClick={() => {
+                                 setShowInputs(true);
+                                 setActiveField('pickup'); // Asegurar que inicie en pickup
+                             }}
+                          >
+                              <FaSearch />
+                              Seleccionar Destino
+                          </button>
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="bg-light p-3 rounded-4 shadow-sm border mt-2">
+                   ) : (
+                    <>
+                       <div className="d-flex align-items-center justify-content-between mb-3">
+                           <h5 className="mb-0 fw-bold text-dark">Planifica tu viaje</h5>
+                           <button className="btn btn-sm btn-close" onClick={() => setShowInputs(false)}></button>
+                       </div>
+
+                       {/* Input Recogida */}
+                       <div className={`input-group mb-3 ${activeField === 'pickup' ? 'border border-primary rounded-3' : ''}`}>
+                         <span className="input-group-text bg-white border-end-0">
+                           <FaMapMarkerAlt className="text-primary" />
+                         </span>
+                         <input 
+                           type="text" 
+                           className="form-control border-start-0" 
+                           placeholder="Dirección de recogida"
+                           value={addressInput.pickup}
+                           onChange={(e) => handleInputChange('pickup', e.target.value)}
+                           onFocus={() => setActiveField('pickup')}
+                           onKeyDown={(e) => e.key === 'Enter' && searchAddress('pickup')}
+                         />
+                         {activeField === 'pickup' && (
+                             <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('pickup')}>
+                                 <FaSearch />
+                             </button>
+                         )}
+                       </div>
+    
+                       {/* Input Destino */}
+                       <div className={`input-group mb-4 ${activeField === 'destination' ? 'border border-danger rounded-3' : ''}`}>
+                         <span className="input-group-text bg-white border-end-0">
+                           <FaMapMarkedAlt className="text-danger" />
+                         </span>
+                         <input 
+                           type="text" 
+                           className="form-control border-start-0" 
+                           placeholder="Dirección de destino"
+                           value={addressInput.destination}
+                           onChange={(e) => handleInputChange('destination', e.target.value)}
+                           onFocus={() => setActiveField('destination')}
+                           onKeyDown={(e) => e.key === 'Enter' && searchAddress('destination')}
+                         />
+                         {activeField === 'destination' && (
+                             <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('destination')}>
+                                 <FaSearch />
+                             </button>
+                         )}
+                       </div>
+    
+                       {/* Botón Confirmar - Solo visible si ambos están completos */}
+                       {pickupLocation && destination && (
+                         <div className="d-grid animate__animated animate__fadeIn">
+                           <button
+                             className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
+                             onClick={handleRequestTaxi}
+                             disabled={loading}
+                             style={{ borderRadius: '15px' }}
+                           >
+                             {loading ? (
+                               <FaSpinner className="spinner-border spinner-border-sm border-0" />
+                             ) : (
+                               <FaTaxi />
+                             )}
+                             {loading ? 'Procesando...' : 'Confirmar y Pedir Taxi'}
+                           </button>
+                         </div>
+                       )}
+                       
+                       {(!pickupLocation || !destination) && (
+                           <p className="text-muted small mb-0 mt-2">
+                             <small>Selecciona los puntos en el mapa o escribe la dirección.</small>
+                           </p>
+                       )}
+                    </>
+                   )}
+                 </div>
+             ) : (
+                // Vista de Viaje Activo (simplificada para encajar en el nuevo layout)
+                <div className="animate__animated animate__fadeIn">
+                    {/* ... (Lógica de viaje activo existente, adaptada si es necesario) ... */}
+                    {/* Copiamos la lógica de renderizado de estado del viaje original */}
+                    
                     {activeTrip.status === 'pending' ? (
                       <div className="text-center py-2">
                         <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
                           <FaClock className="text-warning spinner-grow spinner-grow-sm border-0" />
                           <span className="fw-bold">Esperando un conductor...</span>
                         </div>
-                        <div className="mb-4 bg-white p-4 rounded-4 shadow-sm border border-2 border-warning d-inline-block w-100">
-                          <small className="text-muted d-block text-uppercase fw-bold ls-1 mb-1">Tu ID de Viaje</small>
-                          <span className="display-3 fw-black text-dark tracking-tighter" style={{ fontFamily: 'monospace', letterSpacing: '4px' }}>
-                            {activeTrip.tripId}
-                          </span>
-                        </div>
+                        
+                        <button
+                            className="btn btn-outline-danger w-100 py-2 fw-bold"
+                            onClick={handleCancelTrip}
+                        >
+                            Cancelar
+                        </button>
                       </div>
                     ) : activeTrip.status === 'offered' ? (
-                      <div className="text-center py-2">
-                        <div className="alert alert-warning border-0 rounded-4 py-3 mb-4 shadow-sm">
-                          <h5 className="fw-bold mb-2">¡Nueva Oferta Recibida!</h5>
-                          <p className="mb-0">El conductor ha propuesto un precio para tu viaje.</p>
-                        </div>
-
-                        <div className="bg-white p-4 rounded-4 shadow-sm border border-2 border-warning mb-4">
-                          <small className="text-muted d-block text-uppercase fw-bold mb-1">Precio Propuesto</small>
-                          <span className="display-2 fw-black text-dark">$ {activeTrip.price}</span>
-                        </div>
-
-                        <div className="bg-white p-3 rounded-4 border shadow-sm mb-4 d-flex align-items-center gap-3 text-start">
-                          {activeTrip.driverPhoto ? (
-                            <img src={activeTrip.driverPhoto} alt={activeTrip.driverName} className="rounded-circle" style={{ width: '50px', height: '50px' }} />
-                          ) : (
-                            <FaUserCircle className="text-secondary" style={{ fontSize: '50px' }} />
-                          )}
-                          <div>
-                            <h6 className="mb-0 fw-bold">{activeTrip.driverName}</h6>
-                            <div className="text-warning small">
-                              <FaStar /><FaStar /><FaStar /><FaStar /><FaStar />
+                        <div className="text-center">
+                            <h5 className="fw-bold mb-3">¡Oferta Recibida!</h5>
+                            <h2 className="display-4 fw-bold mb-3">${activeTrip.price}</h2>
+                            <div className="d-flex align-items-center justify-content-center gap-3 mb-4">
+                                {activeTrip.driverPhoto ? (
+                                    <img src={activeTrip.driverPhoto} className="rounded-circle" width="50" height="50" />
+                                ) : <FaUserCircle size={50} />}
+                                <div className="text-start">
+                                    <h6 className="mb-0">{activeTrip.driverName}</h6>
+                                    <small className="text-muted">Conductor</small>
+                                </div>
                             </div>
-                          </div>
+                            <div className="d-grid gap-2">
+                                <button className="btn btn-dark py-3 rounded-pill" onClick={handleAcceptOffer}>Aceptar Oferta</button>
+                                <button className="btn btn-outline-secondary py-2 rounded-pill" onClick={handleDeclineOffer}>Rechazar</button>
+                            </div>
                         </div>
-
-                        <div className="d-grid gap-2">
-                          <button className="btn btn-dark btn-lg rounded-pill fw-bold py-3" onClick={handleAcceptOffer}>
-                            Aceptar Carrera
-                          </button>
-                          <button className="btn btn-outline-secondary rounded-pill fw-bold" onClick={handleDeclineOffer}>
-                            Rechazar y seguir buscando
-                          </button>
-                        </div>
-                      </div>
                     ) : (
-                      <div className="text-start">
-                        {activeTrip.status === 'in_progress' ? (
-                          <div className="alert alert-primary border-0 rounded-4 text-center py-3 mb-3 shadow-sm animate__animated animate__pulse animate__infinite">
-                            <h5 className="fw-bold mb-1"><FaCar className="me-2" /> En Viaje</h5>
-                            <small>Rumbo a tu destino.</small>
-                          </div>
-                        ) : activeTrip.driverArrived ? (
-                          <div className="alert alert-success border-0 rounded-4 text-center py-3 mb-3 shadow-sm animate__animated animate__pulse animate__infinite">
-                            <h5 className="fw-bold mb-1"><FaMapMarkerAlt className="me-2" /> ¡Tu conductor ha llegado!</h5>
-                            <small>Por favor, acércate al punto de recogida.</small>
-                          </div>
-                        ) : null}
-
-                        <div className="d-flex align-items-center gap-2 mb-3 justify-content-center text-success">
-                          <FaTaxi />
-                          <span className="fw-bold">
-                            {activeTrip.status === 'in_progress' ? 'Viaje en curso' : 
-                             activeTrip.driverArrived ? 'Esperándote en el punto' : 'Conductor en camino'}
-                          </span>
-                        </div>
-
-
-
-                        {/* Tarjeta del Conductor */}
-                        <div className="bg-white p-3 rounded-4 border shadow-sm mb-3 d-flex align-items-center gap-3">
-                          {activeTrip.driverPhoto ? (
-                            <img
-                              src={activeTrip.driverPhoto}
-                              alt={activeTrip.driverName}
-                              className="rounded-circle border"
-                              style={{ width: '60px', height: '60px', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <FaUserCircle className="text-secondary" style={{ fontSize: '60px' }} />
-                          )}
-                          <div className="flex-grow-1">
-                            <h6 className="mb-0 fw-bold">{activeTrip.driverName}</h6>
-                            <div className="d-flex align-items-center gap-1 text-warning small">
-                              <FaStar /><FaStar /><FaStar /><FaStar /><FaStar />
-                              <span className="text-muted ms-1">(4.9)</span>
+                        <div className="text-start">
+                            <div className="alert alert-primary border-0 rounded-4 text-center py-3 mb-3 shadow-sm position-relative overflow-hidden">
+                                <h5 className="fw-bold mb-1">
+                                    {activeTrip.status === 'in_progress' ? 'En Viaje' : 'Conductor en camino'}
+                                </h5>
+                                <small className="d-block mb-2">{activeTrip.driverArrived ? '¡El conductor ha llegado!' : 'Tu conductor está cerca'}</small>
+                                
+                                <div className="bg-white bg-opacity-25 p-2 rounded-3 d-inline-block border border-primary border-opacity-25">
+                                    <small className="text-primary-emphasis d-block text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '1px' }}>Código de Viaje</small>
+                                    <span className="fs-4 fw-black text-primary-emphasis tracking-tighter" style={{ fontFamily: 'monospace', letterSpacing: '2px' }}>
+                                        {activeTrip.tripId}
+                                    </span>
+                                </div>
                             </div>
-                            <small className="text-muted">{activeTrip.driverEmail}</small>
-                            {activeTrip.driverStartLocation && (
-                              <button
-                                onClick={handleViewDriverLocation}
-                                className="btn btn-link p-0 text-dark text-decoration-none small d-flex align-items-center gap-1 mt-1"
-                              >
-                                <FaMapMarkerAlt className="text-danger" />
-                                <span>Ver ubicación inicial</span>
-                              </button>
-                            )}
-                          </div>
-                          <button className="btn btn-dark rounded-circle p-2 shadow-sm">
-                            <FaPhoneAlt size={18} />
-                          </button>
-                        </div>
 
-                        <div className="mb-4 text-center bg-white p-3 rounded-4">
-                          <small className="text-muted d-block text-uppercase fw-bold ls-1 mb-1">Id de viaje</small>
-                          <span className="display-4 fw-black text-dark" style={{ fontFamily: 'monospace', letterSpacing: '2px' }}>
-                            {activeTrip.tripId}
-                          </span>
-                          {activeTrip.price && (
-                            <div className="mt-2 text-success fw-bold fs-4">
-                              Precio pactado: ${activeTrip.price}
+                            {/* Detalles del conductor simples */}
+                            <div className="d-flex align-items-center justify-content-between mb-3 w-100 px-2">
+                                <div className="d-flex align-items-center gap-3">
+                                    <FaUserCircle size={40} className="text-secondary" />
+                                    <div>
+                                        <h6 className="mb-0">{activeTrip.driverName}</h6>
+                                        <small className="text-muted d-block">{activeTrip.driverEmail}</small>
+                                        {activeTrip.driverPhone && <small className="text-success fw-bold">{activeTrip.driverPhone}</small>}
+                                    </div>
+                                </div>
+                                {activeTrip.driverPhone && (
+                                    <a href={`tel:${activeTrip.driverPhone}`} className="btn btn-success rounded-circle shadow-sm p-3">
+                                        <FaPhoneAlt size={20} />
+                                    </a>
+                                )}
+                                {console.log(activeTrip)}
                             </div>
-                          )}
                         </div>
-                      </div>
                     )}
+                </div>
+            )}
+          </div>
+        </main>
+      </div>
 
-                    <div className="text-start mb-4 bg-white p-3 rounded-3 border">
-                      <div className="mb-2 pb-2 border-bottom">
-                        <small className="text-muted d-block mb-1">Recogida en:</small>
-                        <p className="small mb-0 text-dark fw-medium lh-sm text-truncate">{activeTrip.address}</p>
-                      </div>
-                      <div className="pt-1">
-                        <small className="text-muted d-block mb-1">Destino:</small>
-                        <p className="small mb-0 text-dark fw-medium lh-sm text-truncate">
-                          {activeTrip.destination?.address || 'No especificado'}
-                        </p>
-                      </div>
-                    </div>
 
-                    <button
-                      className="btn btn-outline-danger w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
-                      onClick={handleCancelTrip}
-                      style={{ borderRadius: '12px' }}
-                    >
-                      <FaTimes /> Cancelar Viaje
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Modal de Completar Perfil - Bloqueante */}
+      {showProfileModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.95)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="bg-white rounded-4 p-4 p-md-5 w-100 shadow-lg position-relative overflow-hidden" style={{ maxWidth: '450px' }}>
+             
+             <div className="text-center mb-4">
+               <div className="bg-warning bg-opacity-25 rounded-circle p-3 d-inline-block mb-3">
+                 <FaUserCircle className="text-warning display-4" size={50} />
+               </div>
+               <h3 className="fw-bold mb-2">¡Casi listo!</h3>
+               <p className="text-muted small">Por favor confirma tus datos para continuar.</p>
+             </div>
+
+             <form onSubmit={handleSaveProfile}>
+               <div className="mb-3">
+                 <label className="form-label fw-bold small text-uppercase text-muted">Nombre</label>
+                 <div className="input-group">
+                   <span className="input-group-text bg-light border-end-0"><FaUserCircle className="text-secondary" /></span>
+                   <input 
+                     type="text" 
+                     className="form-control bg-light border-start-0 py-3 shadow-none" 
+                     placeholder="Tu nombre completo"
+                     value={profileName}
+                     onChange={(e) => setProfileName(e.target.value)}
+                     required
+                   />
+                 </div>
+               </div>
+
+               <div className="mb-3">
+                 <label className="form-label fw-bold small text-uppercase text-muted">Cédula de Identidad</label>
+                 <div className="input-group">
+                   <span className="input-group-text bg-light border-end-0"><FaIdCard className="text-secondary" /></span>
+                   <input 
+                     type="text" 
+                     className="form-control bg-light border-start-0 py-3 shadow-none" 
+                     placeholder="Tu Cédula"
+                     value={profileDni}
+                     onChange={(e) => setProfileDni(e.target.value)}
+                     required
+                   />
+                 </div>
+               </div>
+
+               <div className="mb-4">
+                 <label className="form-label fw-bold small text-uppercase text-muted">Teléfono</label>
+                 <div className="input-group">
+                   <span className="input-group-text bg-light border-end-0"><FaPhoneAlt className="text-secondary" /></span>
+                   <input 
+                     type="tel" 
+                     className="form-control bg-light border-start-0 py-3 shadow-none" 
+                     placeholder="Ej: 04141234567"
+                     value={profilePhone}
+                     onChange={(e) => setProfilePhone(e.target.value)}
+                     required
+                   />
+                 </div>
+                 <div className="form-text small">El conductor te llamará a este número.</div>
+               </div>
+
+               <button 
+                 type="submit" 
+                 className="btn btn-warning w-100 py-3 fw-bold shadow-sm rounded-3 d-flex align-items-center justify-content-center gap-2 text-dark"
+                 disabled={savingProfile}
+               >
+                 {savingProfile ? (
+                   <>
+                     <FaSpinner className="animate-spin" /> Guardando...
+                   </>
+                 ) : (
+                   <>
+                     Continuar <FaCar />
+                   </>
+                 )}
+               </button>
+             </form>
           </div>
         </div>
-      </main>
+      )}
+
     </div>
   );
 };

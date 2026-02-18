@@ -5,11 +5,37 @@ import Drivers from './pages/Drivers'
 import TripDetails from './pages/TripDetails'
 import Profile from './pages/Profile'
 import Drive from './pages/Drive'
+import RegisterVehicle from './pages/RegisterVehicle'
+import MyVehicle from './pages/MyVehicle'
+
+// Admin Pages
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminVehicles from './pages/admin/AdminVehicles';
+import AdminTrips from './pages/admin/AdminTrips';
+import AdminEarnings from './pages/admin/AdminEarnings';
+import AdminRequests from './pages/admin/AdminRequests';
+import AdminSettings from './pages/admin/AdminSettings';
 
 const ProtectedRoute = ({ children, user }) => {
   if (!user) {
     return <Navigate to="/" replace />
   }
+  return children
+}
+
+const AdminRoute = ({ children, user }) => {
+  const adminId = import.meta.env.VITE_ADMIN_ID;
+  
+  if (!user) {
+    return <Navigate to="/" replace />
+  }
+
+  if (user.uid !== adminId) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return children
 }
 
@@ -43,6 +69,33 @@ const Router = ({ user }) => {
           <Profile user={user} />
         </ProtectedRoute>
       } />
+      <Route path="/register-vehicle" element={
+        <ProtectedRoute user={user}>
+          <RegisterVehicle user={user} />
+        </ProtectedRoute>
+      } />
+      <Route path="/my-vehicle" element={
+        <ProtectedRoute user={user}>
+          <MyVehicle user={user} />
+        </ProtectedRoute>
+      } />
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={
+        <AdminRoute user={user}>
+          <AdminLayout />
+        </AdminRoute>
+      }>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="vehicles" element={<AdminVehicles />} />
+        <Route path="trips" element={<AdminTrips />} />
+        <Route path="earnings" element={<AdminEarnings />} />
+        <Route path="requests" element={<AdminRequests />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

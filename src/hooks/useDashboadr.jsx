@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 
 const useDashboard = ({user}) => {
@@ -12,39 +12,125 @@ const useDashboard = ({user}) => {
     const [destination, setDestination] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
     const [pickupLocation, setPickupLocation] = useState(null);
+    const [locationError, setLocationError] = useState(null);
+    const [userPhone, setUserPhone] = useState(null);
+    const [userName, setUserName] = useState(null);
+    const [userDni, setUserDni] = useState(null);
+    const [fetchingProfile, setFetchingProfile] = useState(true);
+
+    // Obtener perfil del usuario desde Firestore
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            if (user?.uid) {
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        setUserPhone(data.phone || null);
+                        setUserName(data.name || user.displayName || null);
+                        setUserDni(data.dni || null);
+                    } else {
+                        // Si el documento no existe (nuevo usuario de Google), usar nombre de Google
+                        setUserName(user.displayName || null);
+                    }
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
+                } finally {
+                    setFetchingProfile(false);
+                }
+            } else {
+                setFetchingProfile(false);
+            }
+        };
+        fetchUserProfile();
+    }, [user]);
+
+    const updateUserProfile = async (name, phone, dni) => {
+        if (!user?.uid) return;
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            // Usar setDoc con merge: true por si el documento no existe
+            const { setDoc } = await import('firebase/firestore'); 
+            const updateData = {
+                name,
+                phone,
+                email: user.email,
+                updatedAt: serverTimestamp()
+            };
+            if (dni) updateData.dni = dni;
+
+            await setDoc(userRef, updateData, { merge: true });
+            
+            setUserName(name);
+            setUserPhone(phone);
+            if (dni) setUserDni(dni);
+            return true;
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            return false;
+        }
+    };
 
 
-    // Ubicación por defecto (Plaza Independencia, San Miguel de Tucumán)
+    // Ubicación por defecto (Coordenadas solicitadas por usuario)
     const DEFAULT_LOCATION = {
-        lat: -26.829,
-        lng: -65.217,
-        address: 'Plaza Independencia, San Miguel de Tucumán (Simulado)'
+        lat: 9.05425221995597,
+        lng: -62.05026626586915,
+        address: 'Ubicación Inicial por Defecto'
     };
 
     // Obtener ubicación inicial del usuario
     useEffect(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const loc = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    setUserLocation(loc);
-                    setPickupLocation(loc);
-                },
-                (error) => {
-                    console.error("Error al obtener ubicación inicial:", error);
-                    // Si falla, usar ubicación por defecto pero sin notificar agresivamente al inicio
-                    setUserLocation(DEFAULT_LOCATION);
-                    setPickupLocation(DEFAULT_LOCATION);
-                },
-                { enableHighAccuracy: true }
-            );
-        } else {
+        if (!navigator.geolocation) {
+            setLocationError("Tu navegador no soporta geolocalización.");
             setUserLocation(DEFAULT_LOCATION);
             setPickupLocation(DEFAULT_LOCATION);
+            return;
         }
+
+        // Verificar permisos primero (opcional, pero buena práctica en navegadores modernos)
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                if (result.state === 'denied') {
+                    setLocationError("Permiso de ubicación denegado. Por favor, habilítalo en la configuración de tu navegador.");
+                }
+            });
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const loc = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                setUserLocation(loc);
+                setPickupLocation(loc);
+                setLocationError(null); // Limpiar error si tiene éxito
+            },
+            (error) => {
+                console.error("Error al obtener ubicación inicial:", error);
+                let errorMsg = "No se pudo obtener tu ubicación.";
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMsg = "Permiso de ubicación denegado. Habilita el GPS y los permisos del navegador.";
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMsg = "La información de ubicación no está disponible. Verifica que tu GPS esté encendido.";
+                        break;
+                    case error.TIMEOUT:
+                        errorMsg = "Se agotó el tiempo para obtener la ubicación.";
+                        break;
+                    default:
+                        errorMsg = "Ocurrió un error desconocido al obtener la ubicación.";
+                        break;
+                }
+                setLocationError(errorMsg);
+                // Si falla, usar ubicación por defecto
+                setUserLocation(DEFAULT_LOCATION);
+                setPickupLocation(DEFAULT_LOCATION);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     }, []);
 
     // Escuchar si el usuario ya tiene un viaje pendiente o aceptado
@@ -54,7 +140,7 @@ const useDashboard = ({user}) => {
         const q = query(
             collection(db, 'taxiRequests'),
             where('userId', '==', user.uid),
-            where('status', 'in', ['pending', 'offered', 'accepted'])
+            where('status', 'in', ['pending', 'offered', 'accepted', 'in_progress'])
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -62,6 +148,15 @@ const useDashboard = ({user}) => {
                 // Tomamos el primer viaje activo encontrado
                 const tripData = snapshot.docs[0].data();
                 setActiveTrip({ id: snapshot.docs[0].id, ...tripData });
+
+                // Fallback: Si hay conductor pero no teléfono en el viaje, buscarlo
+                if (tripData.driverId && !tripData.driverPhone) {
+                    getDoc(doc(db, 'users', tripData.driverId)).then(userDoc => {
+                        if (userDoc.exists() && userDoc.data().phone) {
+                            setActiveTrip(prev => ({ ...prev, driverPhone: userDoc.data().phone }));
+                        }
+                    }).catch(console.error);
+                }
             } else {
                 setActiveTrip(null);
             }
@@ -165,6 +260,7 @@ const useDashboard = ({user}) => {
                     userName: user.displayName || 'Usuario',
                     userEmail: user.email || '',
                     userPhoto: user.photoURL || '',
+                    userPhone: userPhone || '',
                     tripId: tripId,
                     location: {
                         latitude: lat,
@@ -290,7 +386,13 @@ const useDashboard = ({user}) => {
         handleDeclineOffer,
         setDestination,
         pickupLocation,
-        setPickupLocation
+        setPickupLocation,
+        locationError,
+        userPhone,
+        userName,
+        userDni,
+        fetchingProfile,
+        updateUserProfile
     }
 
 }

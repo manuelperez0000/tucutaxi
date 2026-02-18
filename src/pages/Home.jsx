@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaTaxi, FaGoogle, FaEnvelope, FaLock, 
-  FaPhone, FaUser, FaArrowLeft, FaChevronRight 
+  FaPhone, FaUser, FaArrowLeft, FaChevronRight, FaIdCard
 } from 'react-icons/fa';
 import { 
   signInWithRedirect, 
   signInWithPopup,
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  updateProfile 
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase/config';
@@ -18,8 +19,9 @@ import './Home.css';
 const Home = ({ user }) => {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState('selection'); // 'selection', 'register-email', 'login-email'
+  const [view, setView] = useState('selection'); // 'selection', 'register-email', 'login-email', 'forgot-password'
   
   useEffect(() => {
     if (user) {
@@ -31,11 +33,13 @@ const Home = ({ user }) => {
     email: '',
     password: '',
     displayName: '',
-    phone: ''
+    phone: '',
+    dni: ''
   });
 
   const handleViewChange = (newView) => {
     setError(null);
+    setSuccessMessage(null);
     setView(newView);
   };
 
@@ -52,6 +56,34 @@ const Home = ({ user }) => {
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
       setError("Error al conectar con Google.");
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!formData.email) {
+      setError("Por favor, ingresa tu correo electrónico.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      await sendPasswordResetEmail(auth, formData.email);
+      setSuccessMessage("Se ha enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada (y spam).");
+    } catch (error) {
+      console.error("Error enviando correo de recuperación:", error);
+      if (error.code === 'auth/user-not-found') {
+        setError("El correo ingresado no se encuentra registrado.");
+      } else if (error.code === 'auth/invalid-email') {
+        setError("El correo electrónico no es válido.");
+      } else {
+        setError("Ocurrió un error al enviar el correo. Intenta de nuevo.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -74,6 +106,7 @@ const Home = ({ user }) => {
           displayName: formData.displayName,
           email: formData.email,
           phone: formData.phone,
+          dni: formData.dni,
           photoURL: null,
           createdAt: serverTimestamp()
         });
@@ -121,8 +154,8 @@ const Home = ({ user }) => {
                   </button>
                   
                   <div className="position-relative text-center my-3">
-                    <hr className="text-muted opacity-25" />
-                    <span className="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted small">¿Ya tienes cuenta?</span>
+                    {/* <hr className="text-muted opacity-25" /> */}
+                    <span className="position-absolute top-50 start-50 translate-middle px-3 text-muted small">¿Ya tienes cuenta?</span>
                   </div>
                   
                   <button className="btn btn-outline-dark btn-lg fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={() => handleViewChange('login-email')}>
@@ -151,6 +184,13 @@ const Home = ({ user }) => {
                     <div className="input-group">
                       <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaUser className="text-muted" /></span>
                       <input type="text" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="displayName" placeholder="Tu nombre" onChange={handleChange} required />
+                    </div>
+                  </div>
+                  <div className="input-group-auth">
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Cedula de identidad</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaIdCard className="text-muted" /></span>
+                      <input type="text" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="dni" placeholder="Tu Cédula" onChange={handleChange} required />
                     </div>
                   </div>
                   <div className="input-group-auth">
@@ -213,6 +253,9 @@ const Home = ({ user }) => {
                       <input type="password" className="form-control bg-light border-start-0 rounded-end-4 py-2" name="password" placeholder="••••••••" onChange={handleChange} required />
                     </div>
                   </div>
+                  <div className="text-end">
+                     <button type="button" className="btn btn-link text-decoration-none text-muted small p-0" onClick={() => handleViewChange('forgot-password')}>¿Olvidaste tu contraseña?</button>
+                  </div>
                   <button type="submit" className="btn btn-dark btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
                     {loading ? 'Iniciando...' : (
                       <>
@@ -225,6 +268,48 @@ const Home = ({ user }) => {
                 <div className="text-center mt-4">
                   <span className="text-muted">¿No tienes cuenta?</span> <button className="btn btn-link p-0 fw-bold text-decoration-none text-dark" onClick={() => handleViewChange('register-email')}>Regístrate aquí</button>
                 </div>
+              </div>
+            )}
+
+            {/* VISTA DE RECUPERACIÓN DE CONTRASEÑA */}
+            {view === 'forgot-password' && (
+              <div className="auth-view-content animate__animated animate__fadeInRight">
+                <button className="btn btn-link text-decoration-none text-muted fw-bold mb-3 p-0 d-flex align-items-center gap-2" onClick={() => handleViewChange('login-email')}>
+                  <FaArrowLeft /> Volver al Login
+                </button>
+                <div className="auth-header mb-4">
+                  <h2 className="fw-bold mb-1">Recuperar Contraseña</h2>
+                  <p className="text-muted">Ingresa tu correo para recibir un enlace</p>
+                </div>
+
+                {error && <div className="alert alert-danger rounded-4 py-2 px-3 mb-3 small">{error}</div>}
+                {successMessage && <div className="alert alert-success rounded-4 py-2 px-3 mb-3 small">{successMessage}</div>}
+
+                <form className="auth-form d-flex flex-column gap-3" onSubmit={handleForgotPassword}>
+                  <div className="input-group-auth">
+                    <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Correo electrónico</label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaEnvelope className="text-muted" /></span>
+                      <input 
+                        type="email" 
+                        className="form-control bg-light border-start-0 rounded-end-4 py-2" 
+                        name="email" 
+                        placeholder="ejemplo@correo.com" 
+                        onChange={handleChange} 
+                        value={formData.email}
+                        required 
+                      />
+                    </div>
+                  </div>
+                  
+                  <button type="submit" className="btn btn-warning btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
+                    {loading ? 'Enviando...' : (
+                      <>
+                        Enviar Enlace <FaChevronRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
             )}
 

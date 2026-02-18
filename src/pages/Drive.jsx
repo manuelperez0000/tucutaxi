@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import Navbar from '../components/Navbar';
-import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle, FaPhoneAlt } from 'react-icons/fa';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -50,6 +50,24 @@ const Drive = ({ user }) => {
     const [carPosition, setCarPosition] = useState(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
     const watchIdRef = useRef(null);
+    const [driverPhone, setDriverPhone] = useState(null);
+
+    // Obtener teléfono del conductor
+    useEffect(() => {
+        const fetchDriverPhone = async () => {
+            if (user?.uid) {
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        setDriverPhone(userDoc.data().phone);
+                    }
+                } catch (error) {
+                    console.error("Error fetching driver phone:", error);
+                }
+            }
+        };
+        fetchDriverPhone();
+    }, [user]);
     
     // Estados para oferta
     const [showPriceModal, setShowPriceModal] = useState(false);
@@ -327,7 +345,9 @@ const Drive = ({ user }) => {
                 driverId: user.uid,
                 driverName: user.displayName || 'Conductor',
                 driverPhoto: user.photoURL || '',
-                driverEmail: user.email || ''
+                driverEmail: user.email || '',
+                driverPhone: driverPhone || '',
+                driverLocation: carPosition ? { latitude: carPosition[0], longitude: carPosition[1] } : null
             });
             setShowPriceModal(false);
             // Actualizar estado local
@@ -504,9 +524,17 @@ const Drive = ({ user }) => {
                                         <div className="bg-light p-3 rounded-circle">
                                             <FaUser className="text-primary fs-4" />
                                         </div>
-                                        <div>
+                                        <div className="flex-grow-1">
                                             <p className="small text-muted mb-0">Pasajero</p>
-                                            <h6 className="fw-bold mb-0">{trip.userName || 'Usuario'}</h6>
+                                            <div className="d-flex align-items-center justify-content-between">
+                                                <h6 className="fw-bold mb-0">{trip.userName || 'Usuario'}</h6>
+                                                {trip.userPhone && (
+                                                    <a href={`tel:${trip.userPhone}`} className="btn btn-sm btn-success rounded-circle p-2 shadow-sm">
+                                                        <FaPhoneAlt size={14} />
+                                                    </a>
+                                                )}
+                                            </div>
+                                            {trip.userPhone && <small className="text-muted d-block">{trip.userPhone}</small>}
                                         </div>
                                     </div>
 

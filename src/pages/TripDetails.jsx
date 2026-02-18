@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
-import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp, getDoc } from 'firebase/firestore';
 import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle, FaCar } from 'react-icons/fa';
 
 const TripDetails = ({ user }) => {
@@ -23,6 +23,15 @@ const TripDetails = ({ user }) => {
           navigate('/drivers');
         }
         setTrip({ id: docSnap.id, ...data });
+
+        // Fallback: Si falta el teléfono del usuario, buscarlo
+        if (data.userId && !data.userPhone) {
+             getDoc(doc(db, 'users', data.userId)).then(userDoc => {
+                 if (userDoc.exists() && userDoc.data().phone) {
+                     setTrip(prev => ({ ...prev, userPhone: userDoc.data().phone }));
+                 }
+             }).catch(console.error);
+        }
       } else {
         navigate('/drivers');
       }
@@ -169,10 +178,13 @@ const TripDetails = ({ user }) => {
                       <div className="flex-grow-1 overflow-hidden">
                         <h5 className="mb-0 fw-bold text-truncate">{trip.userName}</h5>
                         <small className="text-muted d-block">{trip.userEmail}</small>
+                        {trip.userPhone && <small className="text-success fw-bold d-block">{trip.userPhone}</small>}
                       </div>
-                      <button className="btn btn-dark rounded-circle p-3 shadow-sm">
-                        <FaPhoneAlt />
-                      </button>
+                      {trip.userPhone && (
+                        <a href={`tel:${trip.userPhone}`} className="btn btn-dark rounded-circle p-3 shadow-sm">
+                          <FaPhoneAlt />
+                        </a>
+                      )}
                     </div>
 
                     {/* Ubicación de Recogida y Destino */}

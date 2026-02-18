@@ -60,6 +60,11 @@ const Navbar = ({ user }) => {
                 <FaCar className="me-2" /> Ser conductor
               </Link>
             </li>
+            <li className="nav-item">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/my-vehicle">
+                <FaCar className="me-2" /> Mi Vehículo
+              </Link>
+            </li>
             {/* <li className="nav-item">
               <a className="nav-link btn btn-dark text-white border-0 text-start" href="#">
                 <FaEnvelope className="me-2" /> Contactar

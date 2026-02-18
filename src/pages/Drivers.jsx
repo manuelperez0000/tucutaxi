@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { FaMapMarkerAlt, FaClock, FaCheck, FaTimes } from 'react-icons/fa';
+import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { FaMapMarkerAlt, FaClock, FaCheck, FaTimes, FaCar, FaExclamationTriangle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 const Drivers = ({ user }) => {
@@ -14,8 +14,39 @@ const Drivers = ({ user }) => {
   const [sendingOffer, setSendingOffer] = useState(false);
   const navigate = useNavigate();
 
+  // Estado del conductor
+  const [driverStatus, setDriverStatus] = useState({ 
+    checked: false, 
+    hasVehicle: false, 
+    isApproved: false 
+  });
+
+  // Verificar estado del conductor
+  useEffect(() => {
+    const checkDriverStatus = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setDriverStatus({
+              checked: true,
+              hasVehicle: data.hasVehicle || false,
+              isApproved: data.isDriverApproved || false
+            });
+          }
+        } catch (error) {
+          console.error("Error checking driver status:", error);
+        }
+      }
+    };
+    checkDriverStatus();
+  }, [user]);
+
   useEffect(() => {
     // Escuchar solicitudes pendientes y viajes activos del conductor
+    if (!driverStatus.checked || !driverStatus.hasVehicle || !driverStatus.isApproved) return;
+
     const q = query(
       collection(db, 'taxiRequests'),
       where('status', 'in', ['pending', 'offered', 'accepted'])
@@ -64,7 +95,79 @@ const Drivers = ({ user }) => {
     });
 
     return () => unsubscribe();
-  }, [user.uid, navigate]);
+  }, [user.uid, navigate, driverStatus.checked, driverStatus.hasVehicle, driverStatus.isApproved]);
+
+  if (!driverStatus.checked) {
+    return (
+      <div className="bg-light min-vh-100 d-flex flex-column">
+        <Navbar user={user} />
+        <div className="flex-grow-1 d-flex justify-content-center align-items-center">
+          <div className="spinner-border text-warning" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!driverStatus.hasVehicle) {
+    return (
+      <div className="bg-light min-vh-100">
+        <Navbar user={user} />
+        <div className="container py-5">
+          <div className="row justify-content-center">
+            <div className="col-md-8 col-lg-6 text-center">
+              <div className="card border-0 shadow-lg rounded-4 p-5">
+                <div className="mb-4">
+                  <FaCar className="text-muted display-1" />
+                </div>
+                <h3 className="fw-bold mb-3">Registra tu Vehículo</h3>
+                <p className="text-muted mb-4 fs-5">
+                  Para poder ver las carreras disponibles y trabajar como conductor, necesitas registrar un vehículo.
+                </p>
+                <button 
+                  onClick={() => navigate('/register-vehicle')}
+                  className="btn btn-warning btn-lg fw-bold rounded-pill px-5 shadow-sm"
+                >
+                  Registrar Vehículo Ahora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!driverStatus.isApproved) {
+    return (
+      <div className="bg-light min-vh-100">
+        <Navbar user={user} />
+        <div className="container py-5">
+          <div className="row justify-content-center">
+            <div className="col-md-8 col-lg-6 text-center">
+              <div className="card border-0 shadow-lg rounded-4 p-5">
+                <div className="mb-4">
+                  <FaExclamationTriangle className="text-warning display-1" />
+                </div>
+                <h3 className="fw-bold mb-3">Perfil en Revisión</h3>
+                <p className="text-muted mb-4 fs-5">
+                  Tu perfil y vehículo están siendo revisados por un administrador. 
+                  Te notificaremos cuando puedas comenzar a conducir.
+                </p>
+                <button 
+                  onClick={() => navigate('/my-vehicle')}
+                  className="btn btn-outline-dark fw-bold rounded-pill px-4"
+                >
+                  Ver mi vehículo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleAcceptRequest = (requestId) => {
     setSelectedRequest(requestId);
