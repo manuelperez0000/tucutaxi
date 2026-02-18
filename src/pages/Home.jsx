@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  FaTaxi, FaGoogle, FaEnvelope, FaLock, 
+import {
+  FaGoogle, FaEnvelope, FaLock,
   FaPhone, FaUser, FaArrowLeft, FaChevronRight, FaIdCard
 } from 'react-icons/fa';
-import { 
-  signInWithRedirect, 
+import {
+  signInWithRedirect,
   signInWithPopup,
-  createUserWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
   sendPasswordResetEmail
@@ -22,13 +22,13 @@ const Home = ({ user }) => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('selection'); // 'selection', 'register-email', 'login-email', 'forgot-password'
-  
+
   useEffect(() => {
     if (user) {
       navigate('/dashboard');
     }
   }, [user, navigate]);
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -128,22 +128,19 @@ const Home = ({ user }) => {
   return (
     <div className="home-hero min-vh-100 d-flex align-items-center justify-content-center p-3">
       <div className="home-content-wrapper w-100">
-        <header className="home-brand d-flex align-items-center justify-content-center gap-3 mb-4">
-          <div className="brand-icon-box bg-warning p-3 rounded-4 shadow">
-            <FaTaxi className="brand-icon fs-1 text-dark" />
-          </div>
-          <h1 className="brand-name text-white fw-bold display-4 m-0">TUCUTAXI</h1>
-        </header>
+
 
         <div className="home-actions d-flex flex-column align-items-center w-100">
           <div className="auth-card p-3 p-md-5 rounded-4 shadow-lg w-100" >
-            
+            <header className="home-brand d-flex align-items-center justify-content-center gap-3 mb-4">
+              <h1 className="brand-name text-dark fw-bold display-4 m-0 font-giro">GIRO</h1>
+            </header>
+
             {/* VISTA DE SELECCIÓN INICIAL */}
             {view === 'selection' && (
               <div className="auth-view-content animate__animated animate__fadeIn">
                 <div className="auth-header text-center mb-4">
-                  <h2 className="fw-bold mb-2">Empieza ahora</h2>
-                  <p className="text-muted">Elige cómo quieres unirte a tucutaxi</p>
+                 
                 </div>
                 <div className="auth-selection d-grid gap-3">
                   <button className="btn btn-warning btn-lg fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={() => handleViewChange('register-email')}>
@@ -152,12 +149,12 @@ const Home = ({ user }) => {
                   <button className="btn btn-primary btn-lg border fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={handleGoogleLogin} disabled={loading}>
                     <FaGoogle className="text-danger" /> Registrarse con Google
                   </button>
-                  
+
                   <div className="position-relative text-center my-3">
                     {/* <hr className="text-muted opacity-25" /> */}
                     <span className="position-absolute top-50 start-50 translate-middle px-3 text-muted small">¿Ya tienes cuenta?</span>
                   </div>
-                  
+
                   <button className="btn btn-outline-dark btn-lg fw-bold d-flex align-items-center justify-content-center gap-2 rounded-4 py-3" onClick={() => handleViewChange('login-email')}>
                     <FaLock /> Iniciar Sesión con Correo
                   </button>
@@ -175,7 +172,7 @@ const Home = ({ user }) => {
                   <h2 className="fw-bold mb-1">Crear cuenta</h2>
                   <p className="text-muted">Completa tus datos para empezar</p>
                 </div>
-                
+
                 {error && <div className="alert alert-danger rounded-4 py-2 px-3 mb-3 small">{error}</div>}
 
                 <form className="auth-form d-flex flex-column gap-3" onSubmit={handleSubmit}>
@@ -254,7 +251,7 @@ const Home = ({ user }) => {
                     </div>
                   </div>
                   <div className="text-end">
-                     <button type="button" className="btn btn-link text-decoration-none text-muted small p-0" onClick={() => handleViewChange('forgot-password')}>¿Olvidaste tu contraseña?</button>
+                    <button type="button" className="btn btn-link text-decoration-none text-muted small p-0" onClick={() => handleViewChange('forgot-password')}>¿Olvidaste tu contraseña?</button>
                   </div>
                   <button type="submit" className="btn btn-dark btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
                     {loading ? 'Iniciando...' : (
@@ -264,7 +261,7 @@ const Home = ({ user }) => {
                     )}
                   </button>
                 </form>
-                
+
                 <div className="text-center mt-4">
                   <span className="text-muted">¿No tienes cuenta?</span> <button className="btn btn-link p-0 fw-bold text-decoration-none text-dark" onClick={() => handleViewChange('register-email')}>Regístrate aquí</button>
                 </div>
@@ -290,18 +287,18 @@ const Home = ({ user }) => {
                     <label className="form-label small fw-bold text-uppercase text-muted ms-1 mb-1">Correo electrónico</label>
                     <div className="input-group">
                       <span className="input-group-text bg-light border-end-0 rounded-start-4 ps-3"><FaEnvelope className="text-muted" /></span>
-                      <input 
-                        type="email" 
-                        className="form-control bg-light border-start-0 rounded-end-4 py-2" 
-                        name="email" 
-                        placeholder="ejemplo@correo.com" 
-                        onChange={handleChange} 
+                      <input
+                        type="email"
+                        className="form-control bg-light border-start-0 rounded-end-4 py-2"
+                        name="email"
+                        placeholder="ejemplo@correo.com"
+                        onChange={handleChange}
                         value={formData.email}
-                        required 
+                        required
                       />
                     </div>
                   </div>
-                  
+
                   <button type="submit" className="btn btn-warning btn-lg w-100 rounded-4 fw-bold mt-2 d-flex align-items-center justify-content-center gap-2" disabled={loading}>
                     {loading ? 'Enviando...' : (
                       <>

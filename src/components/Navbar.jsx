@@ -17,8 +17,7 @@ const Navbar = ({ user }) => {
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark px-3 shadow-sm">
       <div className="container-fluid">
         <Link className="navbar-brand d-flex align-items-center gap-2 text-white" to="/">
-          <FaTaxi className="text-warning" />
-          <span className="fw-bold">tucutaxi</span>
+          <span className="fw-bold font-giro" style={{ fontSize: '1.5rem' }}>GIRO</span>
         </Link>
 
         <button

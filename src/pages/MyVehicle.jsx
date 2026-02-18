@@ -73,7 +73,7 @@ const MyVehicle = ({ user }) => {
   };
 
   return (
-    <div className="min-vh-100 bg-light">
+    <div className="min-vh-100">
       <Navbar user={user} />
       <div className="container py-5">
         <div className="row justify-content-center">

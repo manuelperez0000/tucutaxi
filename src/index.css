@@ -13,6 +13,16 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+@font-face {
+  font-family: 'Kumb';
+  src: url('/fonts/Kumb.ttf') format('truetype');
+}
+
+.font-giro {
+  font-family: 'Kumb', sans-serif;
+}
+
+
 a {
   font-weight: 500;
   color: #646cff;

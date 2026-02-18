@@ -370,7 +370,7 @@ const Drivers = ({ user }) => {
       )}
 
       <footer className="text-center py-3 bg-white border-top">
-        <small className="text-muted">Modo Conductor Activo • tucutaxi</small>
+        <small className="text-muted">Modo Conductor Activo • GIRO</small>
       </footer>
     </div>
   );
