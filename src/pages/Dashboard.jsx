@@ -299,6 +299,17 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  const handleResetInputs = () => {
+      setShowInputs(false);
+      setDestination(null);
+      setAddressInput(prev => ({ ...prev, destination: '' }));
+      if (userLocation) {
+          setPickupLocation(userLocation);
+          // El useEffect se encargará de obtener la dirección si falta
+      }
+      setActiveField(null);
+  };
+
   return (
     <div className="position-relative vh-100 overflow-hidden d-flex flex-column">
       
@@ -424,7 +435,11 @@ const Dashboard = ({ user }) => {
                              className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100 rounded-4"
                              onClick={() => {
                                  setShowInputs(true);
-                                 setActiveField('pickup'); // Asegurar que inicie en pickup
+                                 if (pickupLocation) {
+                                     setActiveField('destination');
+                                 } else {
+                                     setActiveField('pickup');
+                                 }
                              }}
                           >
                               <FaSearch />
@@ -438,7 +453,7 @@ const Dashboard = ({ user }) => {
                          <>
                            <div className="d-flex align-items-center justify-content-between mb-3">
                                <h5 className="mb-0 fw-bold text-dark">Planifica tu viaje</h5>
-                               <button className="btn btn-sm btn-close" onClick={() => setShowInputs(false)}></button>
+                               <button className="btn btn-sm btn-close" onClick={handleResetInputs}></button>
                            </div>
 
                            {/* Input Recogida */}
@@ -492,6 +507,7 @@ const Dashboard = ({ user }) => {
                        <div className="d-flex align-items-center justify-content-between mb-3">
                            <button className="btn btn-link text-decoration-none text-dark p-0 d-flex align-items-center gap-2" onClick={() => {
                                setDestination(null); // Limpiar destino para volver a mostrar inputs
+                               setAddressInput(prev => ({ ...prev, destination: '' }));
                                setActiveField('destination');
                            }}>
                                <FaTimes /> Cambiar destino
@@ -597,7 +613,10 @@ const Dashboard = ({ user }) => {
                         
                         <button
                             className="btn btn-outline-danger w-100 py-2 fw-bold"
-                            onClick={handleCancelTrip}
+                            onClick={async () => {
+                                await handleCancelTrip();
+                                handleResetInputs();
+                            }}
                         >
                             Cancelar
                         </button>
