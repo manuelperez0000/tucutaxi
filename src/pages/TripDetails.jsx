@@ -120,7 +120,7 @@ const TripDetails = ({ user }) => {
   if (!trip) return null;
 
   return (
-    <div className="min-vh-100 bg-light d-flex flex-column">
+    <div className="min-vh-100 d-flex flex-column">
       <Navbar user={user} />
       
       <main className="container-fluid py-4 flex-grow-1 px-3 px-md-5">

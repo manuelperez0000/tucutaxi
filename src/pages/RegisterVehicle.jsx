@@ -3,7 +3,7 @@ import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { FaCar, FaMotorcycle, FaCheckCircle, FaSpinner, FaEdit } from 'react-icons/fa';
+import { FaCar, FaMotorcycle, FaCheckCircle, FaSpinner, FaEdit, FaTruck } from 'react-icons/fa';
 
 const RegisterVehicle = ({ user }) => {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ const RegisterVehicle = ({ user }) => {
         vehicleData.updatedAt = serverTimestamp();
       }
 
-      if (vehicleType === 'car') {
+      if (vehicleType === 'car' || vehicleType === 'truck') {
         vehicleData.seats = formData.seats;
         vehicleData.ac = formData.ac === 'yes';
       }
@@ -114,12 +114,20 @@ const RegisterVehicle = ({ user }) => {
                 
                 <div className="d-flex justify-content-center gap-3 mb-4">
                   <button 
-                    className={`btn flex-grow-1 py-3 rounded-3 d-flex flex-column align-items-center gap-2 ${vehicleType === 'car' ? 'btn-warning text-dark fw-bold' : 'btn-outline-secondary'}`}
-                    onClick={() => setVehicleType('car')}
+                    className={`btn flex-grow-1 py-3 rounded-3 d-flex flex-column align-items-center gap-2 ${vehicleType === 'sedan' ? 'btn-warning text-dark fw-bold' : 'btn-outline-secondary'}`}
+                    onClick={() => setVehicleType('sedan')}
                     type="button"
                   >
                     <FaCar size={24} />
-                    Carro
+                    Sedan
+                  </button>
+                  <button 
+                    className={`btn flex-grow-1 py-3 rounded-3 d-flex flex-column align-items-center gap-2 ${vehicleType === 'truck' ? 'btn-warning text-dark fw-bold' : 'btn-outline-secondary'}`}
+                    onClick={() => setVehicleType('truck')}
+                    type="button"
+                  >
+                    <FaTruck size={24} />
+                    Camioneta
                   </button>
                   <button 
                     className={`btn flex-grow-1 py-3 rounded-3 d-flex flex-column align-items-center gap-2 ${vehicleType === 'motorcycle' ? 'btn-warning text-dark fw-bold' : 'btn-outline-secondary'}`}
@@ -170,7 +178,7 @@ const RegisterVehicle = ({ user }) => {
                       />
                     </div>
 
-                    {vehicleType === 'car' && (
+                    {(vehicleType === 'sedan' || vehicleType === 'truck') && (
                       <>
                         <div className="col-md-6">
                           <label className="form-label fw-bold small text-uppercase text-muted">Estado de Asientos</label>

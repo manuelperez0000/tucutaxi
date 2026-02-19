@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Navbar from '../components/Navbar';
-import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt, FaCar, FaSearch, FaIdCard } from 'react-icons/fa';
+import { FaTaxi, FaSpinner, FaTimes, FaClock, FaUserCircle, FaStar, FaPhoneAlt, FaMapMarkerAlt, FaMapMarkedAlt, FaCar, FaSearch, FaIdCard, FaMotorcycle, FaTruck, FaCheckCircle } from 'react-icons/fa';
 import useDashboard from '../hooks/useDashboadr';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -123,6 +123,7 @@ const Dashboard = ({ user }) => {
   };
   const [mapCenter, setMapCenter] = useState({ lat: 9.05425221995597, lng: -62.05026626586915 });
   const [addressInput, setAddressInput] = useState({ pickup: '', destination: '' });
+  const [selectedVehicle, setSelectedVehicle] = useState('sedan');
   const [isSearching, setIsSearching] = useState(false);
   const [showInputs, setShowInputs] = useState(false);
   const [route, setRoute] = useState([]);
@@ -432,71 +433,146 @@ const Dashboard = ({ user }) => {
                       </div>
                    ) : (
                     <>
+                       {/* Ocultar encabezado e inputs si ya se seleccionaron ambos puntos */}
+                       {(!pickupLocation || !destination) && (
+                         <>
+                           <div className="d-flex align-items-center justify-content-between mb-3">
+                               <h5 className="mb-0 fw-bold text-dark">Planifica tu viaje</h5>
+                               <button className="btn btn-sm btn-close" onClick={() => setShowInputs(false)}></button>
+                           </div>
+
+                           {/* Input Recogida */}
+                           <div className={`input-group mb-3 ${activeField === 'pickup' ? 'border border-primary rounded-3' : ''}`}>
+                             <span className="input-group-text bg-white border-end-0">
+                               <FaMapMarkerAlt className="text-primary" />
+                             </span>
+                             <input 
+                               type="text" 
+                               className="form-control border-start-0" 
+                               placeholder="Dirección de recogida"
+                               value={addressInput.pickup}
+                               onChange={(e) => handleInputChange('pickup', e.target.value)}
+                               onFocus={() => setActiveField('pickup')}
+                               onKeyDown={(e) => e.key === 'Enter' && searchAddress('pickup')}
+                             />
+                             {activeField === 'pickup' && (
+                                 <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('pickup')}>
+                                     <FaSearch />
+                                 </button>
+                             )}
+                           </div>
+        
+                           {/* Input Destino */}
+                           <div className={`input-group mb-4 ${activeField === 'destination' ? 'border border-danger rounded-3' : ''}`}>
+                             <span className="input-group-text bg-white border-end-0">
+                               <FaMapMarkedAlt className="text-danger" />
+                             </span>
+                             <input 
+                               type="text" 
+                               className="form-control border-start-0" 
+                               placeholder="Dirección de destino"
+                               value={addressInput.destination}
+                               onChange={(e) => handleInputChange('destination', e.target.value)}
+                               onFocus={() => setActiveField('destination')}
+                               onKeyDown={(e) => e.key === 'Enter' && searchAddress('destination')}
+                             />
+                             {activeField === 'destination' && (
+                                 <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('destination')}>
+                                     <FaSearch />
+                                 </button>
+                             )}
+                           </div>
+                         </>
+                       )}
+    
+                   {/* Selección de Vehículo y Confirmación */}
+                   {pickupLocation && destination && (
+                     <div className="animate__animated animate__fadeIn">
+                       {/* Botón para volver atrás/cancelar selección */}
                        <div className="d-flex align-items-center justify-content-between mb-3">
-                           <h5 className="mb-0 fw-bold text-dark">Planifica tu viaje</h5>
-                           <button className="btn btn-sm btn-close" onClick={() => setShowInputs(false)}></button>
+                           <button className="btn btn-link text-decoration-none text-dark p-0 d-flex align-items-center gap-2" onClick={() => {
+                               setDestination(null); // Limpiar destino para volver a mostrar inputs
+                               setActiveField('destination');
+                           }}>
+                               <FaTimes /> Cambiar destino
+                           </button>
                        </div>
 
-                       {/* Input Recogida */}
-                       <div className={`input-group mb-3 ${activeField === 'pickup' ? 'border border-primary rounded-3' : ''}`}>
-                         <span className="input-group-text bg-white border-end-0">
-                           <FaMapMarkerAlt className="text-primary" />
-                         </span>
-                         <input 
-                           type="text" 
-                           className="form-control border-start-0" 
-                           placeholder="Dirección de recogida"
-                           value={addressInput.pickup}
-                           onChange={(e) => handleInputChange('pickup', e.target.value)}
-                           onFocus={() => setActiveField('pickup')}
-                           onKeyDown={(e) => e.key === 'Enter' && searchAddress('pickup')}
-                         />
-                         {activeField === 'pickup' && (
-                             <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('pickup')}>
-                                 <FaSearch />
-                             </button>
-                         )}
+                       <h6 className="fw-bold text-start mb-3 text-dark">Elige tu vehículo:</h6>
+                       
+                       <div className="d-flex flex-column gap-2 mb-4">
+                         {/* Moto */}
+                         <button 
+                           className={`btn border w-100 p-3 rounded-4 d-flex align-items-center justify-content-between ${selectedVehicle === 'motorcycle' ? 'border-warning bg-warning bg-opacity-10' : 'border-light bg-light'}`}
+                           onClick={() => setSelectedVehicle('motorcycle')}
+                           style={{ transition: 'all 0.2s' }}
+                         >
+                           <div className="d-flex align-items-center gap-3">
+                             <div className={`p-2 rounded-circle ${selectedVehicle === 'motorcycle' ? 'bg-white bg-opacity-50' : 'bg-white'}`}>
+                                <FaMotorcycle size={20} className="text-dark" />
+                             </div>
+                             <div className="text-start">
+                               <div className="fw-bold text-dark">Moto</div>
+                               <small className="text-muted" style={{ fontSize: '0.75rem' }}>1 persona</small>
+                             </div>
+                           </div>
+                           {selectedVehicle === 'motorcycle' && <FaCheckCircle className="text-dark" />}
+                         </button>
+
+                         {/* Sedan */}
+                         <button 
+                           className={`btn border w-100 p-3 rounded-4 d-flex align-items-center justify-content-between ${selectedVehicle === 'sedan' ? 'border-warning bg-warning bg-opacity-10' : 'border-light bg-light'}`}
+                           onClick={() => setSelectedVehicle('sedan')}
+                           style={{ transition: 'all 0.2s' }}
+                         >
+                           <div className="d-flex align-items-center gap-3">
+                             <div className={`p-2 rounded-circle ${selectedVehicle === 'sedan' ? 'bg-white bg-opacity-50' : 'bg-white'}`}>
+                                <FaCar size={20} className="text-dark" />
+                             </div>
+                             <div className="text-start">
+                               <div className="fw-bold text-dark">Sedán</div>
+                               <small className="text-muted" style={{ fontSize: '0.75rem' }}>Hasta 4 personas</small>
+                             </div>
+                           </div>
+                           {selectedVehicle === 'sedan' && <FaCheckCircle className="text-dark" />}
+                         </button>
+
+                         {/* Camioneta */}
+                         <button 
+                           className={`btn border w-100 p-3 rounded-4 d-flex align-items-center justify-content-between ${selectedVehicle === 'truck' ? 'border-warning bg-warning bg-opacity-10' : 'border-light bg-light'}`}
+                           onClick={() => setSelectedVehicle('truck')}
+                           style={{ transition: 'all 0.2s' }}
+                         >
+                           <div className="d-flex align-items-center gap-3">
+                             <div className={`p-2 rounded-circle ${selectedVehicle === 'truck' ? 'bg-white bg-opacity-50' : 'bg-white'}`}>
+                                <FaTruck size={20} className="text-dark" />
+                             </div>
+                             <div className="text-start">
+                               <div className="fw-bold text-dark">Camioneta</div>
+                               <small className="text-muted" style={{ fontSize: '0.75rem' }}>Más espacio</small>
+                             </div>
+                           </div>
+                           {selectedVehicle === 'truck' && <FaCheckCircle className="text-dark" />}
+                         </button>
                        </div>
-    
-                       {/* Input Destino */}
-                       <div className={`input-group mb-4 ${activeField === 'destination' ? 'border border-danger rounded-3' : ''}`}>
-                         <span className="input-group-text bg-white border-end-0">
-                           <FaMapMarkedAlt className="text-danger" />
-                         </span>
-                         <input 
-                           type="text" 
-                           className="form-control border-start-0" 
-                           placeholder="Dirección de destino"
-                           value={addressInput.destination}
-                           onChange={(e) => handleInputChange('destination', e.target.value)}
-                           onFocus={() => setActiveField('destination')}
-                           onKeyDown={(e) => e.key === 'Enter' && searchAddress('destination')}
-                         />
-                         {activeField === 'destination' && (
-                             <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('destination')}>
-                                 <FaSearch />
-                             </button>
-                         )}
+
+                       <div className="d-grid">
+                         <button
+                           className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
+                           onClick={() => handleRequestTaxi(selectedVehicle)}
+                           disabled={loading || !selectedVehicle}
+                           style={{ borderRadius: '15px' }}
+                         >
+                           {loading ? (
+                             <FaSpinner className="spinner-border spinner-border-sm border-0" />
+                           ) : (
+                             <FaTaxi />
+                           )}
+                           {loading ? 'Procesando...' : 'Confirmar y Pedir Viaje'}
+                         </button>
                        </div>
-    
-                       {/* Botón Confirmar - Solo visible si ambos están completos */}
-                       {pickupLocation && destination && (
-                         <div className="d-grid animate__animated animate__fadeIn">
-                           <button
-                             className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100"
-                             onClick={handleRequestTaxi}
-                             disabled={loading}
-                             style={{ borderRadius: '15px' }}
-                           >
-                             {loading ? (
-                               <FaSpinner className="spinner-border spinner-border-sm border-0" />
-                             ) : (
-                               <FaTaxi />
-                             )}
-                             {loading ? 'Procesando...' : 'Confirmar y Pedir Taxi'}
-                           </button>
-                         </div>
-                       )}
+                     </div>
+                   )}
                        
                        {(!pickupLocation || !destination) && (
                            <p className="text-muted small mb-0 mt-2">

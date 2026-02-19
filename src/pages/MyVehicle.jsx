@@ -101,10 +101,12 @@ const MyVehicle = ({ user }) => {
                     <div className="col-6">
                         <div className="p-3 bg-light rounded-3 h-100 border">
                             <small className="d-block text-muted mb-1">Tipo</small>
-                            <span className="fw-bold text-capitalize">{vehicle.type === 'car' ? 'Automóvil' : 'Motocicleta'}</span>
+                            <span className="fw-bold text-capitalize">
+                                {vehicle.type === 'sedan' ? 'Sedán' : vehicle.type === 'truck' ? 'Camioneta' : 'Motocicleta'}
+                            </span>
                         </div>
                     </div>
-                    {vehicle.type === 'car' && (
+                    {(vehicle.type === 'sedan' || vehicle.type === 'truck') && (
                         <>
                             <div className="col-6">
                                 <div className="p-3 bg-light rounded-3 h-100 border">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { FaMapMarkerAlt, FaClock, FaCheck, FaTimes, FaCar, FaExclamationTriangle } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaClock, FaCheck, FaTimes, FaCar, FaExclamationTriangle, FaMotorcycle, FaTruck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 const Drivers = ({ user }) => {
@@ -20,6 +20,7 @@ const Drivers = ({ user }) => {
     hasVehicle: false, 
     isApproved: false 
   });
+  const [vehicleInfo, setVehicleInfo] = useState(null);
 
   // Verificar estado del conductor
   useEffect(() => {
@@ -35,6 +36,12 @@ const Drivers = ({ user }) => {
               isApproved: data.isDriverApproved || false
             });
           }
+
+          // Obtener información del vehículo
+          const vehicleDoc = await getDoc(doc(db, 'vehicles', user.uid));
+          if (vehicleDoc.exists()) {
+            setVehicleInfo(vehicleDoc.data());
+          }
         } catch (error) {
           console.error("Error checking driver status:", error);
         }
@@ -46,6 +53,9 @@ const Drivers = ({ user }) => {
   useEffect(() => {
     // Escuchar solicitudes pendientes y viajes activos del conductor
     if (!driverStatus.checked || !driverStatus.hasVehicle || !driverStatus.isApproved) return;
+
+    // Si aún no tenemos la info del vehículo, no podemos filtrar, pero debemos esperar
+    if (!vehicleInfo) return;
 
     const q = query(
       collection(db, 'taxiRequests'),
@@ -65,7 +75,21 @@ const Drivers = ({ user }) => {
         return;
       }
 
-      const pendingRequests = docs.filter(r => r.status === 'pending');
+      // Filtrar solicitudes pendientes que coincidan con el tipo de vehículo del conductor
+      // Aseguramos que vehicleInfo existe y tiene un tipo antes de filtrar
+      const pendingRequests = docs.filter(r => {
+        if (r.status !== 'pending') return false;
+        
+        // Si la solicitud no especifica tipo, la mostramos (o decidimos no mostrarla)
+        // Aquí asumimos que si especifica tipo, debe coincidir
+        if (r.vehicleType) {
+            return r.vehicleType === vehicleInfo.type;
+        }
+        
+        // Si no tiene tipo especificado, ¿debería verla? Asumamos que sí por compatibilidad, 
+        // o que no si queremos ser estrictos. Por ahora, seamos estrictos si el sistema lo requiere.
+        return false; 
+      });
 
       // Verificar y cancelar solicitudes antiguas (más de 1 hora)
       const oneHourInMillis = 60 * 60 * 1000;
@@ -95,7 +119,7 @@ const Drivers = ({ user }) => {
     });
 
     return () => unsubscribe();
-  }, [user.uid, navigate, driverStatus.checked, driverStatus.hasVehicle, driverStatus.isApproved]);
+  }, [user, navigate, driverStatus.checked, driverStatus.hasVehicle, driverStatus.isApproved, vehicleInfo]);
 
   if (!driverStatus.checked) {
     return (
@@ -237,6 +261,37 @@ const Drivers = ({ user }) => {
       <Navbar user={user} />
       
       <main className="container-fluid py-4 flex-grow-1 px-3 px-md-5">
+        
+        {/* Información del Vehículo - Ultra Compacta */}
+        {vehicleInfo && (
+          <div className="card border-0 shadow-sm rounded-4 mb-4 bg-white overflow-hidden">
+            <div className="card-body p-3 d-flex align-items-center gap-3">
+              <div className="bg-light p-2 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '40px', height: '40px' }}>
+                {vehicleInfo.type === 'motorcycle' ? (
+                  <FaMotorcycle className="text-dark fs-5" />
+                ) : vehicleInfo.type === 'truck' ? (
+                  <FaTruck className="text-dark fs-5" />
+                ) : (
+                  <FaCar className="text-dark fs-5" />
+                )}
+              </div>
+              <div className="flex-grow-1 overflow-hidden d-flex align-items-center">
+                 <h6 className="mb-0 fw-bold text-dark text-truncate">
+                   <span className="text-warning me-1">
+                    {vehicleInfo.type === 'motorcycle' ? 'Moto' : vehicleInfo.type === 'truck' ? 'Camioneta' : 'Sedán'}
+                   </span>
+                   {vehicleInfo.brand} {vehicleInfo.model} {vehicleInfo.year}
+                 </h6>
+              </div>
+              <div className="flex-shrink-0">
+                <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={() => navigate('/my-vehicle')}>
+                  Editar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h1 className="h3 fw-bold mb-0">Solicitudes Disponibles</h1>
           <span className="badge bg-warning text-dark px-3 py-2 rounded-pill shadow-sm">
@@ -283,6 +338,27 @@ const Drivers = ({ user }) => {
                       </div>
 
                       <div className="bg-light p-3 rounded-3 mb-3 flex-grow-1">
+                        {/* Tipo de vehículo solicitado */}
+                        {request.vehicleType && (
+                          <div className="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+                            <div className={`p-2 rounded-circle ${request.vehicleType === 'motorcycle' ? 'bg-warning bg-opacity-25' : 'bg-primary bg-opacity-10'}`}>
+                              {request.vehicleType === 'motorcycle' ? (
+                                <FaMotorcycle className="text-dark" />
+                              ) : request.vehicleType === 'truck' ? (
+                                <FaTruck className="text-dark" />
+                              ) : (
+                                <FaCar className="text-dark" />
+                              )}
+                            </div>
+                            <div className="d-flex flex-column">
+                              <span className="small text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem' }}>Solicita</span>
+                              <span className="fw-bold text-dark" style={{ lineHeight: '1' }}>
+                                {request.vehicleType === 'motorcycle' ? 'Moto' : request.vehicleType === 'truck' ? 'Camioneta' : 'Sedán'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="d-flex align-items-start gap-2 mb-2">
                           <FaMapMarkerAlt className="text-danger mt-1 flex-shrink-0" />
                           <div className="overflow-hidden">

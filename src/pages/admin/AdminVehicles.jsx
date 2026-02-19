@@ -105,7 +105,7 @@ const AdminVehicles = () => {
                     <td className="ps-4 py-3">
                       <div className="d-flex align-items-center">
                         <div className="bg-light rounded-circle p-2 me-3 text-secondary border">
-                          {vehicle.type === 'motorcycle' ? <FaMotorcycle size={20} /> : <FaCar size={20} />}
+                          {vehicle.type === 'motorcycle' ? <FaMotorcycle size={20} /> : vehicle.type === 'truck' ? <FaTruck size={20} /> : <FaCar size={20} />}
                         </div>
                         <div>
                           <div className="fw-bold text-dark">{vehicle.brand} {vehicle.model}</div>

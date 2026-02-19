@@ -226,7 +226,7 @@ const useDashboard = ({user}) => {
         return Math.floor(10000 + Math.random() * 90000).toString();
     };
 
-    const handleRequestTaxi = () => {
+    const handleRequestTaxi = (vehicleType) => {
         if (!destination || !pickupLocation) {
             setShowDestinationSelector(true);
             return;
@@ -262,6 +262,7 @@ const useDashboard = ({user}) => {
                     userPhoto: user.photoURL || '',
                     userPhone: userPhone || '',
                     tripId: tripId,
+                    vehicleType: vehicleType, // Nuevo campo
                     location: {
                         latitude: lat,
                         longitude: lng
@@ -278,7 +279,7 @@ const useDashboard = ({user}) => {
 
                 await addDoc(collection(db, 'taxiRequests'), requestData);
 
-                setMessage({ type: 'success', text: '¡Buscando tu taxi!' });
+                setMessage({ type: 'success', text: '¡Buscando tu conductor!' });
                 setShowDestinationSelector(false);
                 setDestination(null);
                 // No reseteamos pickupLocation, la dejamos por si quiere pedir otro
