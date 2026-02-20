@@ -7,7 +7,7 @@ import Profile from './pages/Profile'
 import Drive from './pages/Drive'
 import RegisterVehicle from './pages/RegisterVehicle'
 import MyVehicle from './pages/MyVehicle'
-import MyTrips from './pages/mytrips'
+import MyTrips from './pages/myTrips'
 import Billing from './pages/Billing'
 
 // Admin Pages
