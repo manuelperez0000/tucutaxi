@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Router from './router'
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase/config';
+import NotificationListener from './components/NotificationListener';
 
 function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
@@ -34,6 +35,7 @@ function App() {
 
   return (
     <div className='bg-cars'>
+      {user && <NotificationListener user={user} />}
       <Router user={user} />
     </div>
   )

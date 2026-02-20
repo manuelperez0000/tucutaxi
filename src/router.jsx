@@ -7,16 +7,20 @@ import Profile from './pages/Profile'
 import Drive from './pages/Drive'
 import RegisterVehicle from './pages/RegisterVehicle'
 import MyVehicle from './pages/MyVehicle'
+import MyTrips from './pages/mytrips'
+import Billing from './pages/Billing'
 
 // Admin Pages
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminUserDetails from './pages/admin/AdminUserDetails';
 import AdminVehicles from './pages/admin/AdminVehicles';
 import AdminTrips from './pages/admin/AdminTrips';
 import AdminEarnings from './pages/admin/AdminEarnings';
 import AdminRequests from './pages/admin/AdminRequests';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminPayments from './pages/admin/AdminPayments';
 
 const ProtectedRoute = ({ children, user }) => {
   if (!user) {
@@ -43,6 +47,7 @@ const Router = ({ user }) => {
   return (
     <Routes>
       <Route path="/" element={<Home user={user} />} />
+      
       <Route path="/drive/:id" element={
         <ProtectedRoute user={user}>
           <Drive user={user} />
@@ -54,6 +59,19 @@ const Router = ({ user }) => {
           <Dashboard user={user} />
         </ProtectedRoute>
       } />
+
+      <Route path="/my-trips" element={
+        <ProtectedRoute user={user}>
+          <MyTrips user={user} />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/billing" element={
+        <ProtectedRoute user={user}>
+          <Billing user={user} />
+        </ProtectedRoute>
+      } />
+
       <Route path="/drivers" element={
         <ProtectedRoute user={user}>
           <Drivers user={user} />
@@ -89,9 +107,11 @@ const Router = ({ user }) => {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="users/:userId" element={<AdminUserDetails />} />
         <Route path="vehicles" element={<AdminVehicles />} />
         <Route path="trips" element={<AdminTrips />} />
         <Route path="earnings" element={<AdminEarnings />} />
+        <Route path="payments" element={<AdminPayments />} />
         <Route path="requests" element={<AdminRequests />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>

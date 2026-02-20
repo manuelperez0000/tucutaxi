@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   FaUsers, FaCar, FaRoute, FaChartLine, FaCog, FaClipboardList, 
-  FaBars, FaTimes, FaSignOutAlt, FaTaxi 
+  FaBars, FaTimes, FaSignOutAlt, FaTaxi, FaMoneyBillWave 
 } from 'react-icons/fa';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
@@ -20,6 +20,7 @@ const AdminLayout = () => {
     { path: '/admin/users', name: 'Usuarios', icon: <FaUsers /> },
     { path: '/admin/vehicles', name: 'Vehículos', icon: <FaCar /> },
     { path: '/admin/trips', name: 'Viajes', icon: <FaRoute /> },
+    { path: '/admin/payments', name: 'Pagos', icon: <FaMoneyBillWave /> },
     /* { path: '/admin/earnings', name: 'Ganancias', icon: <FaChartLine /> }, */
     { path: '/admin/requests', name: 'Solicitudes', icon: <FaClipboardList /> },
     { path: '/admin/settings', name: 'Configuración', icon: <FaCog /> },

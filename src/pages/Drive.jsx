@@ -265,6 +265,38 @@ const Drive = ({ user }) => {
         );
     };
 
+    // Función para finalizar el viaje manualmente
+    const handleCompleteTrip = async () => {
+        const confirmComplete = window.confirm("¿Confirmas que has finalizado el viaje?");
+        if (!confirmComplete) return;
+
+        try {
+            const tripRef = doc(db, 'taxiRequests', id);
+            
+            // Lógica para determinar si la comisión está pagada
+            // Por defecto es false (pago en efectivo, conductor debe comisión)
+            // Si hubiera sistema de saldo/billetera, aquí se descontaría y se marcaría true
+            const isCommissionPaid = false; 
+
+            await updateDoc(tripRef, {
+                status: 'completed',
+                completedAt: new Date(), // Usar Date local o serverTimestamp importado
+                commissionPaid: isCommissionPaid
+            });
+            
+            // Detener navegación y seguimiento
+            setIsNavigating(false);
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+            alert("¡Viaje finalizado exitosamente!");
+        } catch (error) {
+            console.error("Error al finalizar viaje:", error);
+            alert("Error al finalizar el viaje. Intenta de nuevo.");
+        }
+    };
+
     const startRealtimeTracking = (destLat, destLng, ongoingStatus = 'pickup_in_progress', arrivalStatus = 'driver_arrived') => {
         if (!navigator.geolocation) {
              console.error("Geolocalización no soportada");
@@ -278,10 +310,18 @@ const Drive = ({ user }) => {
         const updateFirebaseLocation = async (lat, lng, status) => {
              try {
                 const tripRef = doc(db, 'taxiRequests', id);
-                await updateDoc(tripRef, { 
+                const updateData = { 
                     driverLocation: { latitude: lat, longitude: lng },
                     status: status
-                });
+                };
+                
+                // Si el estado es completado, agregamos campos adicionales
+                if (status === 'completed') {
+                    updateData.completedAt = new Date();
+                    updateData.commissionStatus = false; // Asumimos no pagado por defecto (efectivo)
+                }
+
+                await updateDoc(tripRef, updateData);
              } catch (err) { console.error("Error actualizando Firebase:", err); }
         };
 
@@ -609,23 +649,32 @@ const Drive = ({ user }) => {
                                                 </div>
                                             )
                                         ) : trip.status === 'in_progress' ? (
-                                             !isNavigating ? (
-                                                <button 
-                                                    className="btn btn-primary btn-lg rounded-pill shadow-sm"
-                                                    onClick={handleStartTrip}
-                                                    disabled={loadingLocation}
-                                                >
-                                                    {loadingLocation ? (
-                                                        <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Reanudando...</span>
-                                                    ) : (
-                                                        <span><FaLocationArrow className="me-2" /> Continuar Navegación</span>
-                                                    )}
-                                                </button>
-                                             ) : (
-                                                <div className="alert alert-primary py-2 mb-0 text-center rounded-pill">
-                                                    <small>En viaje hacia el destino...</small>
-                                                </div>
-                                             )
+                                             <div className="d-grid gap-2">
+                                                 {!isNavigating ? (
+                                                    <button 
+                                                        className="btn btn-primary btn-lg rounded-pill shadow-sm"
+                                                        onClick={handleStartTrip}
+                                                        disabled={loadingLocation}
+                                                    >
+                                                        {loadingLocation ? (
+                                                            <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Reanudando...</span>
+                                                        ) : (
+                                                            <span><FaLocationArrow className="me-2" /> Continuar Navegación</span>
+                                                        )}
+                                                    </button>
+                                                 ) : (
+                                                    <div className="alert alert-primary py-2 mb-0 text-center rounded-pill">
+                                                        <small>En viaje hacia el destino...</small>
+                                                    </div>
+                                                 )}
+                                                 
+                                                 <button 
+                                                    className="btn btn-success btn-lg rounded-pill shadow-sm fw-bold"
+                                                    onClick={handleCompleteTrip}
+                                                 >
+                                                    <FaCheckCircle className="me-2" /> Finalizar Viaje
+                                                 </button>
+                                             </div>
                                         ) : trip.status === 'completed' ? (
                                              <div className="alert alert-success py-2 mb-0 text-center rounded-pill">
                                                 <small>¡Viaje finalizado!</small>

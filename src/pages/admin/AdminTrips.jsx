@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
-import { FaRoute, FaSearch, FaSpinner, FaMapMarkerAlt, FaUser, FaCar, FaCalendarAlt, FaMoneyBillWave, FaArrowRight } from 'react-icons/fa';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { FaRoute, FaSearch, FaSpinner, FaMapMarkerAlt, FaUser, FaCar, FaCalendarAlt, FaMoneyBillWave, FaArrowRight, FaTrash } from 'react-icons/fa';
 
 const AdminTrips = () => {
   const [trips, setTrips] = useState([]);
@@ -73,6 +73,18 @@ const AdminTrips = () => {
     fetchTrips();
   }, []);
 
+  const handleDeleteTrip = async (tripId) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este viaje? Esta acción no se puede deshacer.')) {
+      try {
+        await deleteDoc(doc(db, 'taxiRequests', tripId));
+        setTrips(trips.filter(trip => trip.id !== tripId));
+      } catch (error) {
+        console.error("Error al eliminar el viaje:", error);
+        alert('Error al eliminar el viaje. Por favor intenta de nuevo.');
+      }
+    }
+  };
+
   const filteredTrips = trips.filter(trip => 
     (trip.address && trip.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (trip.destination?.address && trip.destination.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -89,7 +101,9 @@ const AdminTrips = () => {
 
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-      <FaSpinner className="spinner-border text-warning display-4" />
+      <div className="spinner-border text-warning" style={{ width: '3rem', height: '3rem' }} role="status">
+        <span className="visually-hidden">Cargando...</span>
+      </div>
     </div>
   );
 
@@ -122,7 +136,7 @@ const AdminTrips = () => {
                 <th className="border-0 py-3">Involucrados</th>
                 <th className="border-0 py-3">Precio</th>
                 <th className="border-0 py-3">Fecha</th>
-                <th className="border-0 py-3 text-end pe-4">Estado</th>
+                <th className="border-0 py-3 text-end pe-4">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -171,9 +185,18 @@ const AdminTrips = () => {
                       </div>
                     </td>
                     <td className="text-end pe-4">
-                      <span className="badge bg-success text-white rounded-pill px-3 py-2">
-                        Completado
-                      </span>
+                      <div className="d-flex justify-content-end align-items-center gap-2">
+                        <span className="badge bg-success text-white rounded-pill px-3 py-2">
+                          Completado
+                        </span>
+                        <button 
+                          className="btn btn-outline-danger btn-sm border-0"
+                          onClick={() => handleDeleteTrip(trip.id)}
+                          title="Eliminar viaje"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

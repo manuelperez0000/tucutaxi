@@ -3,7 +3,7 @@ import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { FaCar, FaMotorcycle, FaCheckCircle, FaSpinner, FaEdit, FaTruck } from 'react-icons/fa';
+import { FaCar, FaMotorcycle, FaCheckCircle, FaEdit, FaTruck } from 'react-icons/fa';
 
 const RegisterVehicle = ({ user }) => {
   const navigate = useNavigate();
@@ -239,7 +239,7 @@ const RegisterVehicle = ({ user }) => {
                       disabled={loading}
                     >
                       {loading ? (
-                        <><FaSpinner className="animate-spin me-2" /> Guardando...</>
+                        <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Guardando...</>
                       ) : (
                         <>{isEditing ? 'Actualizar Vehículo' : 'Registrar Vehículo'} <FaCheckCircle className="ms-2" /></>
                       )}

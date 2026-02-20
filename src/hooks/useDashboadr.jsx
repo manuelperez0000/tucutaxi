@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 
 const useDashboard = ({user}) => {
@@ -254,6 +254,18 @@ const useDashboard = ({user}) => {
 
                 const tripId = generateTripId();
 
+                // Obtener el porcentaje de comisión de la configuración
+                let servicePercentage = 0;
+                try {
+                    const settingsRef = doc(db, 'settings', 'general');
+                    const settingsSnap = await getDoc(settingsRef);
+                    if (settingsSnap.exists()) {
+                        servicePercentage = settingsSnap.data().servicePercentage || 0;
+                    }
+                } catch (err) {
+                    console.error("Error al obtener porcentaje de servicio:", err);
+                }
+
                 // Crear la solicitud en Firestore
                 const requestData = {
                     userId: user.uid,
@@ -263,6 +275,7 @@ const useDashboard = ({user}) => {
                     userPhone: userPhone || '',
                     tripId: tripId,
                     vehicleType: vehicleType, // Nuevo campo
+                    servicePercentage: servicePercentage, // Guardar el porcentaje actual
                     location: {
                         latitude: lat,
                         longitude: lng
@@ -278,6 +291,36 @@ const useDashboard = ({user}) => {
                 };
 
                 await addDoc(collection(db, 'taxiRequests'), requestData);
+
+                // Notificar conductores con vehículo aprobado del mismo tipo
+                try {
+                    const vehiclesQuery = query(
+                        collection(db, 'vehicles'),
+                        where('type', '==', vehicleType),
+                        where('status', '==', 'approved')
+                    );
+                    
+                    const vehicleSnapshot = await getDocs(vehiclesQuery);
+                    
+                    const notificationsPromises = vehicleSnapshot.docs.map(doc => {
+                        const driverId = doc.id; // El ID del doc es el UID del usuario
+                        if (driverId === user.uid) return null; // No auto-notificar
+
+                        return addDoc(collection(db, 'notifications'), {
+                            userId: driverId,
+                            title: 'Nueva Solicitud de Viaje',
+                            body: `Un pasajero ha solicitado un viaje en ${vehicleType === 'motorcycle' ? 'Moto' : vehicleType === 'sedan' ? 'Sedán' : 'Camioneta'} cerca de ti.`,
+                            tripId: tripId,
+                            createdAt: serverTimestamp(),
+                            read: false
+                        });
+                    }).filter(p => p !== null);
+
+                    await Promise.all(notificationsPromises);
+                } catch (notifError) {
+                    console.error("Error enviando notificaciones:", notifError);
+                    // No fallamos la solicitud principal si fallan las notificaciones
+                }
 
                 setMessage({ type: 'success', text: '¡Buscando tu conductor!' });
                 setShowDestinationSelector(false);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { FaUserCircle, FaTaxi, FaEnvelope, FaCar, FaChartLine } from 'react-icons/fa';
+import { FaUserCircle, FaTaxi, FaEnvelope, FaCar, FaChartLine, FaMap, FaHistory, FaIdCard } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
 const Navbar = ({ user }) => {
@@ -35,7 +35,34 @@ const Navbar = ({ user }) => {
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav ms-auto align-items-lg-center gap-2 pt-3 pt-lg-0">
             <li className="nav-items">
-              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/profile">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/dashboard">
+                <FaMap className="me-2" /> Inicio
+              </Link>
+            </li>
+
+            <li className="nav-items">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/my-trips">
+                <FaHistory className="me-2" /> Mis Viajes
+              </Link>
+            </li>
+
+            <li className="nav-item">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/drivers">
+                <FaIdCard className="me-2" /> Ser conductor
+              </Link>
+            </li>
+            <li className="nav-item">
+              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/my-vehicle">
+                <FaCar className="me-2" /> Mi Vehículo
+              </Link>
+            </li>
+            {/* <li className="nav-item">
+              <a className="nav-link btn btn-dark text-white border-0 text-start" href="#">
+                <FaEnvelope className="me-2" /> Contactar
+              </a>
+            </li> */}
+            <li className="nav-items">
+              <Link className="nav-link btn btn-dark text-white border-0" to="/profile">
                 {user?.photoURL ? (
                   <img
                     src={user.photoURL}
@@ -49,26 +76,6 @@ const Navbar = ({ user }) => {
                 Perfil
               </Link>
             </li>
-            <li className="nav-items">
-              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/dashboard">
-                <FaChartLine className="me-2" /> Dashboard
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/drivers">
-                <FaCar className="me-2" /> Ser conductor
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link btn btn-dark text-white border-0 text-start" to="/my-vehicle">
-                <FaCar className="me-2" /> Mi Vehículo
-              </Link>
-            </li>
-            {/* <li className="nav-item">
-              <a className="nav-link btn btn-dark text-white border-0 text-start" href="#">
-                <FaEnvelope className="me-2" /> Contactar
-              </a>
-            </li> */}
             <li className="nav-item mt-2 mt-lg-0">
               <button
                 onClick={handleLogout}
@@ -77,6 +84,7 @@ const Navbar = ({ user }) => {
                 Cerrar Sesión
               </button>
             </li>
+
           </ul>
         </div>
       </div>

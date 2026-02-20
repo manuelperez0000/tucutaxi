@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { FaUser, FaPhone, FaSave, FaCheckCircle, FaSpinner, FaIdCard } from 'react-icons/fa';
+import { FaUser, FaPhone, FaSave, FaCheckCircle, FaIdCard } from 'react-icons/fa';
 
 const Profile = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -191,7 +191,7 @@ const Profile = ({ user }) => {
                   >
                     {saving ? (
                       <>
-                        <FaSpinner className="spinner-border spinner-border-sm border-0" />
+                        <span className="spinner-border spinner-border-sm border-0" role="status" aria-hidden="true"></span>
                         Guardando...
                       </>
                     ) : (

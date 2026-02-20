@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { FaCar, FaMotorcycle, FaSearch, FaSpinner, FaTrash, FaEdit, FaUser, FaPhone, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaCar, FaMotorcycle, FaSearch, FaClock, FaTrash, FaEdit, FaUser, FaPhone, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 const AdminVehicles = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -62,7 +62,9 @@ const AdminVehicles = () => {
 
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-      <FaSpinner className="spinner-border text-warning display-4" />
+      <div className="spinner-border text-warning display-4" role="status">
+        <span className="visually-hidden">Cargando...</span>
+      </div>
     </div>
   );
 
@@ -138,7 +140,7 @@ const AdminVehicles = () => {
                         </span>
                       ) : (
                         <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2">
-                          <FaSpinner className="me-1" /> Pendiente
+                          <FaClock className="me-1" /> Pendiente
                         </span>
                       )}
                     </td>

@@ -58,6 +58,33 @@ const RouteFitter = ({ route }) => {
   return null;
 };
 
+// Componente para el marcador del conductor
+const DriverMarker = ({ activeTrip }) => {
+  if (!activeTrip || !['accepted', 'driver_arrived', 'in_progress'].includes(activeTrip.status)) return null;
+
+  const lat = activeTrip.driverLocation?.latitude || activeTrip.driverStartLocation?.lat;
+  const lng = activeTrip.driverLocation?.longitude || activeTrip.driverStartLocation?.lng;
+  
+  if (!lat || !lng) return null;
+
+  return (
+    <Marker position={[lat, lng]} icon={carIcon} zIndexOffset={1000}>
+      <Popup>
+        <div className="text-center">
+          <strong>{activeTrip.driverName || 'Conductor'}</strong><br/>
+          <small>{activeTrip.status === 'driver_arrived' ? '¡Ha llegado!' : 'En camino'}</small>
+        </div>
+      </Popup>
+    </Marker>
+  );
+};
+
+// Componente para la línea de ruta
+const RoutePolyline = ({ route }) => {
+    if (!route || route.length === 0) return null;
+    return <Polyline positions={route} color="blue" weight={5} opacity={0.7} />;
+};
+
 const Dashboard = ({ user }) => {
   const {
     loading,
@@ -134,12 +161,19 @@ const Dashboard = ({ user }) => {
         const response = await fetch(
             `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`
         );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        if (data.code === 'Ok' && data.routes.length > 0) {
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
             return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
         }
     } catch (error) {
-        console.error("Error al obtener ruta:", error);
+        console.warn("Error al obtener ruta (OSRM puede estar sobrecargado):", error);
+        // Retornar una línea recta como fallback en caso de error
+        return [[startLat, startLng], [endLat, endLng]];
     }
     return null;
   };
@@ -147,6 +181,7 @@ const Dashboard = ({ user }) => {
   // Efecto para calcular la ruta (ya sea viaje activo o planificación)
   useEffect(() => {
     const calculateRoute = async () => {
+        // ... (código previo para obtener coordenadas) ...
         let startLat, startLng, endLat, endLng;
 
         // Caso 0: Planificación (Sin viaje activo, pero con origen y destino seleccionados)
@@ -173,7 +208,8 @@ const Dashboard = ({ user }) => {
 
         if (startLat && startLng && endLat && endLng) {
             const coords = await getRoute(startLat, startLng, endLat, endLng);
-            if (coords) {
+            // Validamos que el componente siga montado antes de setear estado (aunque React 18 lo maneja, es buena práctica si el fetch es lento)
+            if (coords && coords.length > 0) {
                 setRoute(coords);
             }
         } else {
@@ -377,34 +413,11 @@ const Dashboard = ({ user }) => {
           )} */}
 
           {/* Ruta calculada (Calles) */}
-          {route.length > 0 && (
-             <>
-                <Polyline positions={route} color="blue" weight={5} opacity={0.7} />
-                <RouteFitter route={route} />
-             </>
-          )}
+          <RoutePolyline route={route} />
+          <RouteFitter route={route} />
 
           {/* Conductor en viaje activo */}
-          {activeTrip && ['accepted', 'driver_arrived', 'in_progress'].includes(activeTrip.status) && (
-            (() => {
-                const lat = activeTrip.driverLocation?.latitude || activeTrip.driverStartLocation?.lat;
-                const lng = activeTrip.driverLocation?.longitude || activeTrip.driverStartLocation?.lng;
-                
-                if (lat && lng) {
-                    return (
-                        <Marker position={[lat, lng]} icon={carIcon} zIndexOffset={1000}>
-                            <Popup>
-                                <div className="text-center">
-                                    <strong>{activeTrip.driverName || 'Conductor'}</strong><br/>
-                                    <small>{activeTrip.status === 'driver_arrived' ? '¡Ha llegado!' : 'En camino'}</small>
-                                </div>
-                            </Popup>
-                        </Marker>
-                    );
-                }
-                return null;
-            })()
-          )}
+          <DriverMarker activeTrip={activeTrip} />
         </MapContainer>
       </div>
 
@@ -429,7 +442,7 @@ const Dashboard = ({ user }) => {
                  <div className="animate__animated animate__fadeInUp">
                    
                    {!showInputs ? (
-                      <div className="d-grid gap-3">
+                      <div key="selection-mode" className="d-grid gap-3">
                           <h5 className="mb-2 fw-bold text-dark">¿A dónde quieres ir hoy?</h5>
                           <button 
                              className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100 rounded-4"
@@ -447,7 +460,7 @@ const Dashboard = ({ user }) => {
                           </button>
                       </div>
                    ) : (
-                    <>
+                    <div key="input-mode">
                        {/* Ocultar encabezado e inputs si ya se seleccionaron ambos puntos */}
                        {(!pickupLocation || !destination) && (
                          <>
@@ -580,10 +593,10 @@ const Dashboard = ({ user }) => {
                            style={{ borderRadius: '15px' }}
                          >
                            {loading ? (
-                             <FaSpinner className="spinner-border spinner-border-sm border-0" />
-                           ) : (
-                             <FaTaxi />
-                           )}
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          ) : (
+                            <FaTaxi />
+                          )}
                            {loading ? 'Procesando...' : 'Confirmar y Pedir Viaje'}
                          </button>
                        </div>
@@ -595,7 +608,7 @@ const Dashboard = ({ user }) => {
                              <small>Selecciona los puntos en el mapa o escribe la dirección.</small>
                            </p>
                        )}
-                    </>
+                    </div>
                    )}
                  </div>
              ) : (
@@ -760,7 +773,7 @@ const Dashboard = ({ user }) => {
                >
                  {savingProfile ? (
                    <>
-                     <FaSpinner className="animate-spin" /> Guardando...
+                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Guardando...
                    </>
                  ) : (
                    <>

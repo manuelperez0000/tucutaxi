@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { FaUserCheck, FaCar, FaSpinner, FaCheckCircle, FaIdCard, FaPhone, FaEnvelope, FaInfoCircle } from 'react-icons/fa';
+import { FaUserCheck, FaCar, FaCheckCircle, FaIdCard, FaPhone, FaEnvelope, FaInfoCircle } from 'react-icons/fa';
 
 const AdminRequests = () => {
   const [requests, setRequests] = useState([]);

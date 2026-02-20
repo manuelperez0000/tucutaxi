@@ -88,7 +88,8 @@ const TripDetails = ({ user }) => {
       const tripRef = doc(db, 'taxiRequests', trip.id);
       await updateDoc(tripRef, {
         status: 'completed',
-        completedAt: serverTimestamp()
+        completedAt: serverTimestamp(),
+        commissionStatus:false
       });
       alert("¡Viaje completado con éxito!");
       navigate('/drivers');
