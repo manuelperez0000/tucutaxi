@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp, getDoc } from 'firebase/firestore';
-import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle, FaCar } from 'react-icons/fa';
+import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle, FaCar, FaDollarSign } from 'react-icons/fa';
 
 const TripDetails = ({ user }) => {
   const { id } = useParams();
@@ -158,7 +158,7 @@ const TripDetails = ({ user }) => {
                 {trip.status === 'offered' ? (
                   <div className="text-center py-4">
                     <div className="spinner-border text-warning mb-3" role="status"></div>
-                    <p className="text-muted">Estamos esperando que el pasajero revise y acepte tu oferta de <strong>${trip.price}</strong>.</p>
+                    <p className="text-muted">Estamos esperando que el pasajero revise y acepte tu oferta de <strong>{trip.price > 0 ? `$${trip.price}` : 'GRATIS'}</strong>.</p>
                     <button 
                       onClick={handleReleaseTrip}
                       className="btn btn-outline-danger w-100 rounded-pill mt-3"
@@ -222,6 +222,21 @@ const TripDetails = ({ user }) => {
                           </button>
                         )}
                       </div>
+                    </div>
+
+                    {/* Precio del Viaje */}
+                    <div className="bg-white p-3 rounded-4 border shadow-sm mb-4">
+                        <div className="d-flex align-items-center gap-3">
+                            <div className="bg-light p-2 rounded-circle">
+                                <FaDollarSign className="text-warning fs-4" />
+                            </div>
+                            <div>
+                                <p className="small text-muted mb-0 fw-bold text-uppercase">Precio Acordado</p>
+                                <p className="fw-black mb-0 text-success fs-3 lh-1">
+                                    {trip.price > 0 ? `$${trip.price}` : 'GRATIS'}
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Tiempo Transcurrido */}

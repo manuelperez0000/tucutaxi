@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import Navbar from '../components/Navbar';
-import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle, FaPhoneAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle, FaPhoneAlt, FaDollarSign } from 'react-icons/fa';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -371,9 +371,15 @@ const Drive = ({ user }) => {
     }, []);
 
     const handleSendOffer = async () => {
-        if (!offerPrice || isNaN(offerPrice) || Number(offerPrice) <= 0) {
+        const priceNum = parseFloat(offerPrice);
+        if (isNaN(priceNum) || priceNum < 0) {
             alert("Por favor, ingresa un precio válido.");
             return;
+        }
+
+        if (priceNum === 0) {
+             const confirmFree = window.confirm("¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?");
+             if (!confirmFree) return;
         }
 
         setSendingOffer(true);
@@ -610,7 +616,7 @@ const Drive = ({ user }) => {
                                             </button>
                                         ) : trip.status === 'offered' ? (
                                             <div className="alert alert-warning text-center rounded-pill fw-bold mb-0">
-                                                Esperando respuesta del pasajero... (${trip.price})
+                                                Esperando respuesta del pasajero... ({trip.price > 0 ? `$${trip.price}` : 'GRATIS'})
                                             </div>
                                         ) : trip.status === 'accepted' ? (
                                             !isNavigating ? (

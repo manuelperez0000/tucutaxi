@@ -637,7 +637,14 @@ const Dashboard = ({ user }) => {
                     ) : activeTrip.status === 'offered' ? (
                         <div className="text-center">
                             <h5 className="fw-bold mb-3">¡Oferta Recibida!</h5>
-                            <h2 className="display-4 fw-bold mb-3">${activeTrip.price}</h2>
+                            {Number(activeTrip.price) === 0 ? (
+                                <div className="alert alert-success border-0 rounded-4 py-4 mb-3 shadow-sm animate__animated animate__pulse animate__infinite">
+                                    <h2 className="display-3 fw-black mb-0 text-success">GRATIS</h2>
+                                    <small className="fw-bold text-uppercase text-success" style={{ letterSpacing: '2px' }}>¡Viaje sin costo!</small>
+                                </div>
+                            ) : (
+                                <h2 className="display-4 fw-bold mb-3">${activeTrip.price}</h2>
+                            )}
                             <div className="d-flex align-items-center justify-content-center gap-3 mb-4">
                                 {activeTrip.driverPhoto ? (
                                     <img src={activeTrip.driverPhoto} className="rounded-circle" width="50" height="50" />
@@ -654,6 +661,13 @@ const Dashboard = ({ user }) => {
                         </div>
                     ) : (
                         <div className="text-start">
+                            {Number(activeTrip.price) === 0 && (
+                                <div className="alert alert-success border-0 rounded-4 text-center py-3 mb-3 shadow-sm animate__animated animate__fadeIn">
+                                    <h2 className="display-4 fw-black mb-0 text-success">GRATIS</h2>
+                                    <small className="fw-bold text-uppercase text-success">Viaje de cortesía</small>
+                                </div>
+                            )}
+
                             <div className="alert alert-primary border-0 rounded-4 text-center py-3 mb-3 shadow-sm position-relative overflow-hidden">
                                 <h5 className="fw-bold mb-1">
                                     {activeTrip.status === 'in_progress' ? 'En Viaje' : 'Conductor en camino'}

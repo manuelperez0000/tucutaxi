@@ -200,9 +200,16 @@ const Drivers = ({ user }) => {
 
   const handleSendOffer = async (e) => {
     e.preventDefault();
-    if (!price || isNaN(price) || parseFloat(price) <= 0) {
+    const priceValue = parseFloat(price);
+    
+    if (isNaN(priceValue) || priceValue < 0) {
       alert("Por favor, ingresa un precio válido.");
       return;
+    }
+
+    if (priceValue === 0) {
+      const confirmFree = window.confirm("¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?");
+      if (!confirmFree) return;
     }
 
     setSendingOffer(true);
