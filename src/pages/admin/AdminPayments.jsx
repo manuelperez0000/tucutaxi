@@ -2,12 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { FaCheckCircle, FaTimesCircle, FaSearch, FaFileInvoiceDollar, FaCalendarAlt, FaUser } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const AdminPayments = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [processingId, setProcessingId] = useState(null);
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'primary'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     fetchPayments();
@@ -30,10 +42,18 @@ const AdminPayments = () => {
     }
   };
 
-  const handleApprovePayment = async (payment) => {
-    if (!window.confirm(`¿Estás seguro de aprobar el pago de $${payment.amount} del conductor ${payment.driverName}?`)) {
-      return;
-    }
+  const handleApprovePayment = (payment) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Aprobar Pago",
+      message: `¿Estás seguro de aprobar el pago de $${payment.amount} del conductor ${payment.driverName}?`,
+      variant: 'success',
+      onConfirm: () => executeApprovePayment(payment)
+    });
+  };
+
+  const executeApprovePayment = async (payment) => {
+    closeConfirmModal();
 
     try {
       setProcessingId(payment.id);
@@ -62,56 +82,69 @@ const AdminPayments = () => {
         )
       );
 
-      alert("Pago aprobado correctamente.");
+      toast.success("Pago aprobado correctamente.");
 
     } catch (error) {
       console.error("Error al aprobar pago:", error);
-      alert("Hubo un error al aprobar el pago.");
+      toast.error("Hubo un error al aprobar el pago.");
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleRejectPayment = async (payment) => {
-    const reason = prompt("Ingrese el motivo del rechazo:");
-    if (reason === null) return; // Cancelado
+  const handleRejectPayment = (payment) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Rechazar Pago",
+      message: `¿Estás seguro de rechazar el pago de $${payment.amount}? Esta acción revertirá el estado de los viajes.`,
+      variant: 'danger',
+      onConfirm: () => executeRejectPayment(payment)
+    });
+  };
 
-    try {
-      setProcessingId(payment.id);
+  const executeRejectPayment = (payment) => {
+    closeConfirmModal();
+    
+    setTimeout(async () => {
+        const reason = prompt("Ingrese el motivo del rechazo (opcional):") || "Rechazado por administrador";
+        
+        try {
+            setProcessingId(payment.id);
 
-      // 1. Actualizar estado del pago
-      const paymentRef = doc(db, 'payments', payment.id);
-      await updateDoc(paymentRef, {
-        status: 'rejected',
-        rejectionReason: reason,
-        rejectedAt: serverTimestamp()
-      });
+            // 1. Actualizar estado del pago
+            const paymentRef = doc(db, 'payments', payment.id);
+            await updateDoc(paymentRef, {
+                status: 'rejected',
+                rejectionReason: reason,
+                rejectedAt: serverTimestamp()
+            });
 
-      // 2. Revertir estado de los viajes a false (pendiente de pago)
-      if (payment.tripIds && payment.tripIds.length > 0) {
-        const batch = writeBatch(db);
-        payment.tripIds.forEach(tripId => {
-          const tripRef = doc(db, 'taxiRequests', tripId);
-          batch.update(tripRef, { commissionStatus: false });
-        });
-        await batch.commit();
-      }
+            // 2. Revertir estado de los viajes a false (pendiente de pago)
+            if (payment.tripIds && payment.tripIds.length > 0) {
+                const batch = writeBatch(db);
+                payment.tripIds.forEach(tripId => {
+                  const tripRef = doc(db, 'taxiRequests', tripId);
+                  batch.update(tripRef, { commissionStatus: false });
+                });
+                await batch.commit();
+            }
 
-      // Actualizar estado local
-      setPayments(prevPayments => 
-        prevPayments.map(p => 
-          p.id === payment.id ? { ...p, status: 'rejected' } : p
-        )
-      );
+            // Actualizar estado local
+            setPayments(prevPayments => 
+                prevPayments.map(p => 
+                p.id === payment.id ? { ...p, status: 'rejected' } : p
+                )
+            );
 
-      alert("Pago rechazado. La deuda ha vuelto a ser pendiente para el conductor.");
+            toast.info("Pago rechazado. La deuda ha vuelto a ser pendiente para el conductor.");
 
-    } catch (error) {
-      console.error("Error al rechazar pago:", error);
-      alert("Hubo un error al rechazar el pago.");
-    } finally {
-      setProcessingId(null);
-    }
+        } catch (error) {
+            console.error("Error al rechazar pago:", error);
+            toast.error("Hubo un error al rechazar el pago.");
+        } finally {
+            setProcessingId(null);
+        }
+    }, 100);
   };
 
   const formatDate = (timestamp) => {
@@ -312,6 +345,15 @@ const AdminPayments = () => {
           </table>
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        loading={!!processingId}
+      />
     </div>
   );
 };

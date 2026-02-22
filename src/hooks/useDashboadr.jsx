@@ -1,6 +1,7 @@
 import { db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
+import NominatimService from '../services/nominatim';
 
 const useDashboard = ({user}) => {
 
@@ -17,6 +18,7 @@ const useDashboard = ({user}) => {
     const [userName, setUserName] = useState(null);
     const [userDni, setUserDni] = useState(null);
     const [fetchingProfile, setFetchingProfile] = useState(true);
+    const [userState, setUserState] = useState(null);
 
     // Obtener perfil del usuario desde Firestore
     useEffect(() => {
@@ -106,6 +108,19 @@ const useDashboard = ({user}) => {
                 setUserLocation(loc);
                 setPickupLocation(loc);
                 setLocationError(null); // Limpiar error si tiene éxito
+
+                // Obtener el estado (provincia/región) basado en la ubicación
+                NominatimService.reverseGeocode(loc.lat, loc.lng)
+                    .then(data => {
+                        if (data && data.address) {
+                            const state = data.address.state || data.address.province;
+                            if (state) {
+                                console.log("Usuario localizado en:", state);
+                                setUserState(state);
+                            }
+                        }
+                    })
+                    .catch(err => console.error("Error al obtener estado del usuario:", err));
             },
             (error) => {
                 console.error("Error al obtener ubicación inicial:", error);
@@ -215,7 +230,7 @@ const useDashboard = ({user}) => {
         return () => clearInterval(timer);
     }, [activeTrip?.status, activeTrip?.driverArrived, activeTrip?.driverStartLocation, activeTrip?.location, countdown]);
 
-    const formatTime = (seconds) => {
+    const FORMAT_TIME = (seconds) => {
         if (seconds === null) return '--:--';
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -243,9 +258,8 @@ const useDashboard = ({user}) => {
                 // Si no tenemos dirección, intentamos geocodificar
                 if (!address) {
                     try {
-                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
-                        const data = await response.json();
-                        address = data.display_name || 'Ubicación sin nombre';
+                        const data = await NominatimService.reverseGeocode(lat, lng);
+                        address = data?.display_name || 'Ubicación sin nombre';
                     } catch (err) {
                         console.error("Error al obtener dirección:", err);
                         address = 'Ubicación seleccionada (Manual)';
@@ -351,9 +365,6 @@ const useDashboard = ({user}) => {
     const handleCancelTrip = async () => {
         if (!activeTrip) return;
 
-        const confirmCancel = window.confirm("¿Estás seguro de que deseas cancelar tu solicitud de taxi?");
-        if (!confirmCancel) return;
-
         try {
             const tripRef = doc(db, 'taxiRequests', activeTrip.id);
             await updateDoc(tripRef, {
@@ -361,7 +372,7 @@ const useDashboard = ({user}) => {
                 cancelledAt: serverTimestamp()
             });
             setActiveTrip(null);
-            setMessage({ type: 'success', text: 'Viamente.' });
+            setMessage({ type: 'success', text: 'Viaje cancelado correctamente.' });
         } catch (error) {
             console.error("Error al cancelar viaje:", error);
             setMessage({ type: 'danger', text: 'No se pudo cancelar el viaje.' });
@@ -436,7 +447,8 @@ const useDashboard = ({user}) => {
         userName,
         userDni,
         fetchingProfile,
-        updateUserProfile
+        updateUserProfile,
+        userState
     }
 
 }

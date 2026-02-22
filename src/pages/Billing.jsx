@@ -4,6 +4,8 @@ import { db } from '../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { FaMoneyBillWave, FaClock, FaCheckCircle, FaExclamationCircle, FaArrowLeft, FaUniversity, FaMobileAlt, FaCopy } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const Billing = ({ user }) => {
   const [unpaidTrips, setUnpaidTrips] = useState([]);
@@ -14,6 +16,16 @@ const Billing = ({ user }) => {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'primary'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   // Datos de pago de prueba
   const paymentData = {
@@ -41,7 +53,7 @@ const Billing = ({ user }) => {
         const userRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists() || !userSnap.data().hasVehicle) {
-            alert("Acceso denegado: Esta sección es solo para conductores.");
+            toast.error("Acceso denegado: Esta sección es solo para conductores.");
             navigate('/my-trips');
             return;
         }
@@ -116,12 +128,24 @@ const Billing = ({ user }) => {
 
   const handleReportPayment = async () => {
     if (!referenceNumber.trim()) {
-      alert("Por favor, ingresa el número de referencia del pago.");
+      toast.warning("Por favor, ingresa el número de referencia del pago.");
       return;
     }
 
     if (!user) return;
 
+    setConfirmModal({
+      isOpen: true,
+      title: "Reportar Pago",
+      message: `¿Estás seguro de reportar el pago por un monto de $${totalDebt.toFixed(2)}?`,
+      variant: 'success',
+      confirmText: 'Reportar Pago',
+      onConfirm: executeReportPayment
+    });
+  };
+
+  const executeReportPayment = async () => {
+    closeConfirmModal();
     try {
       setIsSubmitting(true);
 
@@ -143,7 +167,6 @@ const Billing = ({ user }) => {
       await addDoc(collection(db, 'payments'), paymentData);
 
       // 3. Actualizar estado de los viajes a 'pending_approval'
-      // Usamos writeBatch para atomicidad
       const batch = writeBatch(db);
       unpaidTrips.forEach(trip => {
         const tripRef = doc(db, 'taxiRequests', trip.id);
@@ -151,24 +174,18 @@ const Billing = ({ user }) => {
       });
       await batch.commit();
 
-      alert("Pago reportado exitosamente. Tu pago está sujeto a verificación.");
+      toast.success("Pago reportado exitosamente. Tu pago está sujeto a verificación.");
       setShowPaymentModal(false);
       setReferenceNumber('');
       
-      // Recargar lista (o redirigir)
-      // En este caso, al actualizar commissionStatus a pending_approval, 
-      // la query original (commissionStatus == false) ya no los traerá,
-      // así que basta con limpiar el estado local o dejar que el efecto se encargue si hubiera listener.
-      // Como usamos fetch simple, forzamos recarga o limpiamos:
       setUnpaidTrips([]);
       setTotalDebt(0);
       
-      // Opcional: Navegar a MyTrips
       navigate('/my-trips');
 
     } catch (error) {
       console.error("Error al reportar pago:", error);
-      alert("Hubo un error al reportar el pago. Intenta de nuevo.");
+      toast.error("Hubo un error al reportar el pago. Intenta de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -176,7 +193,7 @@ const Billing = ({ user }) => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert("Copiado al portapapeles: " + text);
+    toast.info("Copiado al portapapeles: " + text);
   };
 
   return (
@@ -390,6 +407,16 @@ const Billing = ({ user }) => {
         </div>
       )}
 
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+        loading={isSubmitting}
+      />
     </div>
   );
 };

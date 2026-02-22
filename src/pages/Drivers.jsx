@@ -4,6 +4,8 @@ import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { FaMapMarkerAlt, FaClock, FaCheck, FaTimes, FaCar, FaExclamationTriangle, FaMotorcycle, FaTruck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const Drivers = ({ user }) => {
   const [requests, setRequests] = useState([]);
@@ -13,6 +15,16 @@ const Drivers = ({ user }) => {
   const [price, setPrice] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
   const navigate = useNavigate();
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'primary'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   // Estado del conductor
   const [driverStatus, setDriverStatus] = useState({ 
@@ -203,15 +215,27 @@ const Drivers = ({ user }) => {
     const priceValue = parseFloat(price);
     
     if (isNaN(priceValue) || priceValue < 0) {
-      alert("Por favor, ingresa un precio válido.");
+      toast.warning("Por favor, ingresa un precio válido.");
       return;
     }
 
     if (priceValue === 0) {
-      const confirmFree = window.confirm("¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?");
-      if (!confirmFree) return;
+      setConfirmModal({
+        isOpen: true,
+        title: "Oferta Gratuita",
+        message: "¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?",
+        variant: 'warning',
+        confirmText: 'Continuar',
+        onConfirm: () => executeSendOffer(priceValue)
+      });
+      return;
     }
 
+    executeSendOffer(priceValue);
+  };
+
+  const executeSendOffer = async (priceValue) => {
+    closeConfirmModal();
     setSendingOffer(true);
     try {
       // Intentar obtener la ubicación del conductor
@@ -237,7 +261,7 @@ const Drivers = ({ user }) => {
       const requestRef = doc(db, 'taxiRequests', selectedRequest);
       await updateDoc(requestRef, {
         status: 'offered', // Cambiamos a 'offered' para que el pasajero apruebe
-        price: parseFloat(price),
+        price: priceValue,
         driverId: user.uid,
         driverName: user.displayName,
         driverPhoto: user.photoURL,
@@ -246,13 +270,14 @@ const Drivers = ({ user }) => {
         offeredAt: serverTimestamp()
       });
 
+      toast.success("Oferta enviada con éxito.");
       setShowPriceModal(false);
       setPrice('');
       setSelectedRequest(null);
       
     } catch (error) {
       console.error("Error al enviar oferta:", error);
-      alert("No se pudo enviar la oferta. Intenta de nuevo.");
+      toast.error("No se pudo enviar la oferta. Intenta de nuevo.");
     } finally {
       setSendingOffer(false);
     }
@@ -451,6 +476,16 @@ const Drivers = ({ user }) => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+      />
 
       <footer className="text-center py-3 bg-white border-top">
         <small className="text-muted">Modo Conductor Activo • GIRO</small>

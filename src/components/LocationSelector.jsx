@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { FaMapMarkerAlt, FaSearch } from 'react-icons/fa';
+import NominatimService from '../services/nominatim';
+import { toast } from 'react-toastify';
 
 // Fix for default marker icon
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -18,7 +20,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const LocationMarker = ({ position, setPosition, setAddress }) => {
-  const map = useMapEvents({
+  useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
       setPosition({ lat, lng });
@@ -43,9 +45,8 @@ const MapUpdater = ({ center }) => {
 
 const reverseGeocode = async (lat, lng, setAddress) => {
   try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
-    const data = await response.json();
-    setAddress(data.display_name || 'Ubicación seleccionada');
+    const data = await NominatimService.reverseGeocode(lat, lng);
+    setAddress(data?.display_name || 'Ubicación seleccionada');
   } catch (err) {
     console.error("Error al obtener dirección:", err);
   }
@@ -58,7 +59,8 @@ const LocationSelector = ({
     placeholder = "Buscar dirección...",
     confirmText = "Confirmar Ubicación",
     confirmButtonColor = "btn-dark",
-    iconColorClass = "text-danger"
+    iconColorClass = "text-danger",
+    userState = null // Nuevo prop para filtrar por estado
 }) => {
   const [selectedPos, setSelectedPos] = useState(initialLocation ? { lat: initialLocation.lat, lng: initialLocation.lng } : null);
   const [address, setAddress] = useState(initialLocation?.address || '');
@@ -88,8 +90,7 @@ const LocationSelector = ({
 
     setSearching(true);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`);
-      const data = await response.json();
+      const data = await NominatimService.searchAddress(searchQuery, 1, userState);
       if (data && data.length > 0) {
         const { lat, lon, display_name } = data[0];
         const newPos = { lat: parseFloat(lat), lng: parseFloat(lon) };
@@ -97,10 +98,11 @@ const LocationSelector = ({
         setAddress(display_name);
         setMapCenter(newPos);
       } else {
-        alert("No se encontró la ubicación");
+        toast.warning("No se encontró la ubicación");
       }
     } catch (err) {
       console.error("Error al buscar ubicación:", err);
+      toast.error("Error al buscar ubicación");
     } finally {
       setSearching(false);
     }
@@ -151,6 +153,11 @@ const LocationSelector = ({
             <MapContainer 
               center={[mapCenter.lat, mapCenter.lng]} 
               zoom={15} 
+              minZoom={6}
+              maxBounds={[
+                [0.6, -73.5], // South West (Venezuela)
+                [12.5, -59.5] // North East (Venezuela)
+              ]}
               style={{ height: '100%', width: '100%' }}
             >
               <TileLayer

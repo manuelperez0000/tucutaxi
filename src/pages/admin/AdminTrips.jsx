@@ -2,22 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { FaRoute, FaSearch, FaSpinner, FaMapMarkerAlt, FaUser, FaCar, FaCalendarAlt, FaMoneyBillWave, FaArrowRight, FaTrash } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const AdminTrips = () => {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [processingId, setProcessingId] = useState(null);
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     const fetchTrips = async () => {
       try {
         const tripsRef = collection(db, 'taxiRequests');
-        // Filtramos por estado 'completed'
-        // Nota: Si no hay índice compuesto, esto podría fallar con orderBy. 
-        // Para evitar errores de índice en desarrollo, primero obtenemos y luego ordenamos en cliente si es necesario,
-        // o usamos solo where si la colección es pequeña.
-        // Intentaremos traer todos los 'completed'
-        const q = query(tripsRef, where('status', '==', 'completed'));
+        const q = query(tripsRef, where('status', '==', 'completed'), orderBy('createdAt', 'desc'));
         
         const querySnapshot = await getDocs(q);
         
@@ -55,13 +63,6 @@ const AdminTrips = () => {
           };
         }));
 
-        // Ordenar por fecha (más reciente primero) en el cliente
-        tripsData.sort((a, b) => {
-            const dateA = a.createdAt?.seconds || 0;
-            const dateB = b.createdAt?.seconds || 0;
-            return dateB - dateA;
-        });
-
         setTrips(tripsData);
       } catch (error) {
         console.error("Error fetching trips:", error);
@@ -73,15 +74,28 @@ const AdminTrips = () => {
     fetchTrips();
   }, []);
 
-  const handleDeleteTrip = async (tripId) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este viaje? Esta acción no se puede deshacer.')) {
-      try {
-        await deleteDoc(doc(db, 'taxiRequests', tripId));
-        setTrips(trips.filter(trip => trip.id !== tripId));
-      } catch (error) {
-        console.error("Error al eliminar el viaje:", error);
-        alert('Error al eliminar el viaje. Por favor intenta de nuevo.');
-      }
+  const handleDeleteTrip = (tripId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Eliminar Viaje",
+      message: "¿Estás seguro de que quieres eliminar este viaje? Esta acción no se puede deshacer.",
+      variant: 'danger',
+      onConfirm: () => executeDeleteTrip(tripId)
+    });
+  };
+
+  const executeDeleteTrip = async (tripId) => {
+    closeConfirmModal();
+    setProcessingId(tripId);
+    try {
+      await deleteDoc(doc(db, 'taxiRequests', tripId));
+      setTrips(trips.filter(trip => trip.id !== tripId));
+      toast.success("Viaje eliminado correctamente.");
+    } catch (error) {
+      console.error("Error al eliminar el viaje:", error);
+      toast.error('Error al eliminar el viaje. Por favor intenta de nuevo.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -214,6 +228,15 @@ const AdminTrips = () => {
           </table>
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        loading={!!processingId}
+      />
     </div>
   );
 };
