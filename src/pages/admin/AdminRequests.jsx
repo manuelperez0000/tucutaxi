@@ -2,11 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/config';
 import { collection, getDocs, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { FaUserCheck, FaCar, FaCheckCircle, FaIdCard, FaPhone, FaEnvelope, FaInfoCircle } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const AdminRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'primary'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     fetchRequests();
@@ -50,9 +62,18 @@ const AdminRequests = () => {
     }
   };
 
-  const handleApprove = async (userId) => {
-    if (!window.confirm("¿Estás seguro de que deseas aprobar a este conductor?")) return;
-    
+  const handleApprove = (userId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Aprobar Solicitud",
+      message: "¿Estás seguro de que deseas aprobar a este conductor?",
+      variant: 'success',
+      onConfirm: () => executeApprove(userId)
+    });
+  };
+
+  const executeApprove = async (userId) => {
+    closeConfirmModal();
     setProcessingId(userId);
     try {
       // 1. Aprobar al usuario como conductor
@@ -73,11 +94,53 @@ const AdminRequests = () => {
 
       // Eliminar de la lista local
       setRequests(prev => prev.filter(req => req.id !== userId));
-      alert("Conductor aprobado exitosamente.");
+      toast.success("Conductor aprobado exitosamente.");
 
     } catch (error) {
       console.error("Error al aprobar conductor:", error);
-      alert("Error al aprobar la solicitud. Inténtalo de nuevo.");
+      toast.error("Error al aprobar conductor.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = (userId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Rechazar Solicitud",
+      message: "¿Estás seguro de que deseas rechazar a este conductor? Esto eliminará su solicitud de vehículo.",
+      variant: 'danger',
+      onConfirm: () => executeReject(userId)
+    });
+  };
+
+  const executeReject = async (userId) => {
+    closeConfirmModal();
+    setProcessingId(userId);
+    try {
+      // 1. Desaprobar al usuario como conductor y quitar vehículo
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        isDriverApproved: false,
+        hasVehicle: false
+      });
+
+      // 2. Actualizar estado del vehículo a 'rejected'
+      const vehicleRef = doc(db, 'vehicles', userId);
+      const vehicleSnap = await getDoc(vehicleRef);
+      if (vehicleSnap.exists()) {
+        await updateDoc(vehicleRef, {
+          status: 'rejected'
+        });
+      }
+
+      // Eliminar de la lista local
+      setRequests(prev => prev.filter(req => req.id !== userId));
+      toast.info("Solicitud rechazada.");
+
+    } catch (error) {
+      console.error("Error al rechazar conductor:", error);
+      toast.error("Error al rechazar conductor.");
     } finally {
       setProcessingId(null);
     }
@@ -222,6 +285,15 @@ const AdminRequests = () => {
           ))}
         </div>
       )}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        loading={!!processingId}
+      />
     </div>
   );
 };

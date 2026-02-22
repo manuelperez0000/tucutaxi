@@ -7,6 +7,8 @@ import Navbar from '../components/Navbar';
 import { FaArrowLeft, FaMapMarkerAlt, FaUser, FaClock, FaChevronDown, FaChevronUp, FaCar, FaLocationArrow, FaCheckCircle, FaPhoneAlt, FaDollarSign } from 'react-icons/fa';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -73,6 +75,16 @@ const Drive = ({ user }) => {
     const [showPriceModal, setShowPriceModal] = useState(false);
     const [offerPrice, setOfferPrice] = useState('');
     const [sendingOffer, setSendingOffer] = useState(false);
+    
+    const [confirmModal, setConfirmModal] = useState({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      variant: 'primary'
+    });
+
+    const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
     
     // Estado para notificación de pasajero aceptado
     const [passengerAccepted, setPassengerAccepted] = useState(false);
@@ -189,14 +201,14 @@ const Drive = ({ user }) => {
             // Iniciar seguimiento en tiempo real
             startRealtimeTracking(endLat, endLng, ongoingStatus, arrivalStatus);
         } else {
-            alert("No se pudo calcular la ruta.");
+            toast.error("No se pudo calcular la ruta.");
         }
     };
 
     // Función para iniciar la navegación al punto de recogida
     const handleStartPickup = () => {
         if (!navigator.geolocation) {
-            alert("Tu navegador no soporta geolocalización.");
+            toast.error("Tu navegador no soporta geolocalización.");
             return;
         }
 
@@ -223,7 +235,7 @@ const Drive = ({ user }) => {
             (error) => {
                 setLoadingLocation(false);
                 console.error("Error al obtener ubicación:", error);
-                alert("No se pudo obtener tu ubicación actual.");
+                toast.error("No se pudo obtener tu ubicación actual.");
             }, 
             options
         );
@@ -232,7 +244,7 @@ const Drive = ({ user }) => {
     // Función para iniciar el viaje al destino
     const handleStartTrip = () => {
         if (!navigator.geolocation) {
-            alert("Tu navegador no soporta geolocalización.");
+            toast.error("Tu navegador no soporta geolocalización.");
             return;
         }
 
@@ -259,17 +271,26 @@ const Drive = ({ user }) => {
             (error) => {
                 setLoadingLocation(false);
                 console.error("Error al obtener ubicación:", error);
-                alert("No se pudo obtener tu ubicación actual.");
+                toast.error("No se pudo obtener tu ubicación actual.");
             }, 
             options
         );
     };
 
     // Función para finalizar el viaje manualmente
-    const handleCompleteTrip = async () => {
-        const confirmComplete = window.confirm("¿Confirmas que has finalizado el viaje?");
-        if (!confirmComplete) return;
+    const handleCompleteTrip = () => {
+        setConfirmModal({
+            isOpen: true,
+            title: "Finalizar Viaje",
+            message: "¿Confirmas que has finalizado el viaje?",
+            variant: 'success',
+            confirmText: 'Finalizar',
+            onConfirm: executeCompleteTrip
+        });
+    };
 
+    const executeCompleteTrip = async () => {
+        closeConfirmModal();
         try {
             const tripRef = doc(db, 'taxiRequests', id);
             
@@ -290,10 +311,10 @@ const Drive = ({ user }) => {
                 navigator.geolocation.clearWatch(watchIdRef.current);
                 watchIdRef.current = null;
             }
-            alert("¡Viaje finalizado exitosamente!");
+            toast.success("¡Viaje finalizado exitosamente!");
         } catch (error) {
             console.error("Error al finalizar viaje:", error);
-            alert("Error al finalizar el viaje. Intenta de nuevo.");
+            toast.error("Error al finalizar el viaje. Intenta de nuevo.");
         }
     };
 
@@ -351,7 +372,7 @@ const Drive = ({ user }) => {
                         watchIdRef.current = null;
                     }
                     setIsNavigating(false);
-                    alert(arrivalStatus === 'driver_arrived' ? "¡Has llegado al punto de recogida!" : "¡Has llegado al destino!");
+                    toast.success(arrivalStatus === 'driver_arrived' ? "¡Has llegado al punto de recogida!" : "¡Has llegado al destino!");
                 } else {
                     // En camino
                     updateFirebaseLocation(latitude, longitude, ongoingStatus);
@@ -370,18 +391,30 @@ const Drive = ({ user }) => {
         };
     }, []);
 
-    const handleSendOffer = async () => {
+    const handleSendOffer = () => {
         const priceNum = parseFloat(offerPrice);
         if (isNaN(priceNum) || priceNum < 0) {
-            alert("Por favor, ingresa un precio válido.");
+            toast.warning("Por favor, ingresa un precio válido.");
             return;
         }
 
         if (priceNum === 0) {
-             const confirmFree = window.confirm("¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?");
-             if (!confirmFree) return;
+             setConfirmModal({
+                isOpen: true,
+                title: "Oferta Gratuita",
+                message: "¡Atención! Estás ofreciendo este viaje de forma GRATUITA (precio $0). ¿Deseas continuar?",
+                variant: 'warning',
+                confirmText: 'Continuar',
+                onConfirm: () => executeSendOffer()
+             });
+             return;
         }
+        
+        executeSendOffer();
+    };
 
+    const executeSendOffer = async () => {
+        closeConfirmModal();
         setSendingOffer(true);
         try {
             const tripRef = doc(db, 'taxiRequests', id);
@@ -398,9 +431,10 @@ const Drive = ({ user }) => {
             setShowPriceModal(false);
             // Actualizar estado local
             setTrip(prev => ({ ...prev, status: 'offered', price: offerPrice }));
+            toast.success("Oferta enviada correctamente.");
         } catch (error) {
             console.error("Error al enviar oferta:", error);
-            alert("Hubo un error al enviar la oferta.");
+            toast.error("Hubo un error al enviar la oferta.");
         } finally {
             setSendingOffer(false);
         }
@@ -538,6 +572,16 @@ const Drive = ({ user }) => {
                         </div>
                     </div>
                 )}
+
+                <ConfirmationModal
+                    isOpen={confirmModal.isOpen}
+                    onClose={closeConfirmModal}
+                    onConfirm={confirmModal.onConfirm}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    variant={confirmModal.variant}
+                    confirmText={confirmModal.confirmText}
+                />
 
                 {/* Tarjeta de información superpuesta */}
                 <div className="position-absolute bottom-0 start-0 w-100 p-3" style={{ zIndex: 1000, background: 'linear-gradient(to top, rgba(0,0,0,0.1), transparent)', pointerEvents: 'none' }}>

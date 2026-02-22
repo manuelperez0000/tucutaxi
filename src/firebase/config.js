@@ -7,10 +7,10 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: 'usuarios-b6168',
+  projectId: 'taxi-47b31',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: '1:1077345151387:web:5c9c23d441d8924ba8993e'
+  appId: '1:646227458223:web:31f5916b0f627511863c5a'
 };
 
 // Inicializar Firebase

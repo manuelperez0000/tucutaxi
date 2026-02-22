@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { FaUser, FaCar, FaClock, FaMoneyBillWave, FaMapMarkerAlt, FaHistory, FaPercentage, FaFilter, FaCalendarAlt, FaTimes, FaCheckCircle, FaExclamationCircle, FaUniversity, FaMobileAlt, FaCopy, FaArrowRight } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -38,7 +39,7 @@ const MyTrips = ({ user }) => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert("Copiado al portapapeles: " + text);
+    toast.info("Copiado al portapapeles: " + text);
   };
 
   useEffect(() => {

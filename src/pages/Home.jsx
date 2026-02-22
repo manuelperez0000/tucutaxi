@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase/config';
+import { toast } from 'react-toastify';
 import './Home.css';
 
 const Home = ({ user }) => {
@@ -63,7 +64,7 @@ const Home = ({ user }) => {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!formData.email) {
-      setError("Por favor, ingresa tu correo electrónico.");
+      toast.error("Por favor, ingresa tu correo electrónico.");
       return;
     }
 
@@ -73,15 +74,15 @@ const Home = ({ user }) => {
 
     try {
       await sendPasswordResetEmail(auth, formData.email);
-      setSuccessMessage("Se ha enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada (y spam).");
+      toast.success("Se ha enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada (y spam).");
     } catch (error) {
       console.error("Error enviando correo de recuperación:", error);
       if (error.code === 'auth/user-not-found') {
-        setError("El correo ingresado no se encuentra registrado.");
+        toast.error("El correo ingresado no se encuentra registrado.");
       } else if (error.code === 'auth/invalid-email') {
-        setError("El correo electrónico no es válido.");
+        toast.error("El correo electrónico no es válido.");
       } else {
-        setError("Ocurrió un error al enviar el correo. Intenta de nuevo.");
+        toast.error("Ocurrió un error al enviar el correo. Intenta de nuevo.");
       }
     } finally {
       setLoading(false);
@@ -116,10 +117,10 @@ const Home = ({ user }) => {
       }
     } catch (error) {
       console.error("Error en autenticación:", error);
-      if (error.code === 'auth/email-already-in-use') setError("El correo ya está registrado.");
-      else if (error.code === 'auth/weak-password') setError("La contraseña es muy débil.");
-      else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') setError("Credenciales incorrectas.");
-      else setError("Ocurrió un error. Intenta de nuevo.");
+      if (error.code === 'auth/email-already-in-use') toast.error("El correo ya está registrado.");
+      else if (error.code === 'auth/weak-password') toast.error("La contraseña es muy débil.");
+      else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') toast.error("Credenciales incorrectas.");
+      else toast.error("Ocurrió un error. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }

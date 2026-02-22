@@ -4,6 +4,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc, setDoc, getDoc } f
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { FaCar, FaMotorcycle, FaCheckCircle, FaEdit, FaTruck } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const RegisterVehicle = ({ user }) => {
   const navigate = useNavigate();
@@ -93,7 +94,7 @@ const RegisterVehicle = ({ user }) => {
       navigate('/my-vehicle');
     } catch (error) {
       console.error("Error al registrar vehículo:", error);
-      alert("Hubo un error al registrar tu vehículo. Inténtalo de nuevo.");
+      toast.error("Hubo un error al registrar tu vehículo. Inténtalo de nuevo.");
     } finally {
       setLoading(false);
     }

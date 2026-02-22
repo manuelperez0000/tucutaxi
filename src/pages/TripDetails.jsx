@@ -4,12 +4,23 @@ import Navbar from '../components/Navbar';
 import { db } from '../firebase/config';
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp, getDoc } from 'firebase/firestore';
 import { FaUser, FaMapMarkerAlt, FaClock, FaTimes, FaTaxi, FaPhoneAlt, FaCheckCircle, FaCar, FaDollarSign } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const TripDetails = ({ user }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     if (!id) return;
@@ -41,12 +52,20 @@ const TripDetails = ({ user }) => {
     return () => unsubscribe();
   }, [id, user.uid, navigate]);
 
-  const handleReleaseTrip = async () => {
+  const handleReleaseTrip = () => {
     if (!trip) return;
 
-    const confirmRelease = window.confirm("¿Estás seguro de que quieres cancelar este viaje? Volverá a estar disponible para otros conductores.");
-    if (!confirmRelease) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Cancelar Viaje",
+      message: "¿Estás seguro de que quieres cancelar este viaje? Volverá a estar disponible para otros conductores.",
+      variant: 'danger',
+      onConfirm: executeReleaseTrip
+    });
+  };
 
+  const executeReleaseTrip = async () => {
+    closeConfirmModal();
     try {
       const tripRef = doc(db, 'taxiRequests', trip.id);
       await updateDoc(tripRef, {
@@ -64,7 +83,7 @@ const TripDetails = ({ user }) => {
       navigate('/drivers');
     } catch (error) {
       console.error("Error al liberar viaje:", error);
-      alert("No se pudo liberar el viaje. Intenta de nuevo.");
+      toast.error("No se pudo liberar el viaje. Intenta de nuevo.");
     }
   };
 
@@ -91,10 +110,11 @@ const TripDetails = ({ user }) => {
         completedAt: serverTimestamp(),
         commissionStatus:false
       });
-      alert("¡Viaje completado con éxito!");
+      toast.success("¡Viaje completado con éxito!");
       navigate('/drivers');
     } catch (error) {
       console.error("Error al completar viaje:", error);
+      toast.error("Error al completar el viaje");
     }
   };
 
@@ -282,6 +302,14 @@ const TripDetails = ({ user }) => {
           </div>
         </div>
       </main>
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

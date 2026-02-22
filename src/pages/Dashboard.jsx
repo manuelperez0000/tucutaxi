@@ -6,6 +6,10 @@ import useDashboard from '../hooks/useDashboadr';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import NominatimService from '../services/nominatim';
+import AddressAutocomplete from '../components/AddressAutocomplete';
+import { toast } from 'react-toastify';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -107,11 +111,23 @@ const Dashboard = ({ user }) => {
     userName,
     userDni,
     fetchingProfile,
-    updateUserProfile
+    updateUserProfile,
+    userState
   } = useDashboard({ user });
 
-  const [activeField, setActiveField] = useState('pickup'); // 'pickup' | 'destination' | null
+  const [activeField, setActiveField] = useState(null); // 'pickup' | 'destination' | null
+  const [selectionStep, setSelectionStep] = useState('initial'); // 'initial' | 'pickup' | 'destination' | 'confirm'
   
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    variant: 'danger'
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
   // Estado para el modal de completar perfil
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileName, setProfileName] = useState('');
@@ -136,7 +152,7 @@ const Dashboard = ({ user }) => {
   const handleSaveProfile = async (e) => {
       e.preventDefault();
       if (!profileName.trim() || !profilePhone.trim() || !profileDni.trim()) {
-          alert("Por favor completa todos los campos");
+          toast.warning("Por favor completa todos los campos");
           return;
       }
       setSavingProfile(true);
@@ -144,15 +160,14 @@ const Dashboard = ({ user }) => {
       setSavingProfile(false);
       if (success) {
           setShowProfileModal(false);
+          toast.success("Perfil actualizado correctamente");
       } else {
-          alert("Error al guardar perfil. Intenta de nuevo.");
+          toast.error("Error al guardar perfil. Intenta de nuevo.");
       }
   };
   const [mapCenter, setMapCenter] = useState({ lat: 9.05425221995597, lng: -62.05026626586915 });
   const [addressInput, setAddressInput] = useState({ pickup: '', destination: '' });
   const [selectedVehicle, setSelectedVehicle] = useState('sedan');
-  const [isSearching, setIsSearching] = useState(false);
-  const [showInputs, setShowInputs] = useState(false);
   const [route, setRoute] = useState([]);
 
   // Función auxiliar para obtener ruta (igual que en Drive.jsx)
@@ -227,7 +242,7 @@ const Dashboard = ({ user }) => {
   // Si el hook pide mostrar el selector (por validación fallida), iniciamos el flujo
   useEffect(() => {
     if (showDestinationSelector) {
-        setShowInputs(true);
+        setSelectionStep('pickup');
         setActiveField('pickup');
         setShowDestinationSelector(false);
     }
@@ -259,10 +274,27 @@ const Dashboard = ({ user }) => {
     }
   }, [userLocation]);
 
-  // Sincronizar inputs con ubicaciones seleccionadas
+  const [pickupState, setPickupState] = useState(null);
+
+  // Sincronizar inputs con ubicaciones seleccionadas y obtener estado de pickup
   useEffect(() => {
     if (pickupLocation?.address) {
       setAddressInput(prev => ({ ...prev, pickup: pickupLocation.address }));
+      
+      // Obtener el estado del punto de recogida si tenemos coordenadas
+      if (pickupLocation.lat && pickupLocation.lng) {
+          NominatimService.reverseGeocode(pickupLocation.lat, pickupLocation.lng)
+              .then(data => {
+                  if (data && data.address) {
+                      const state = data.address.state || data.address.province;
+                      if (state) {
+                          console.log("Estado de recogida:", state);
+                          setPickupState(state);
+                      }
+                  }
+              })
+              .catch(err => console.error("Error obteniendo estado de recogida:", err));
+      }
     }
   }, [pickupLocation]);
 
@@ -280,70 +312,31 @@ const Dashboard = ({ user }) => {
     
     // Geocodificación inversa
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
-      const data = await response.json();
-      const address = data.display_name || 'Ubicación seleccionada';
+      const data = await NominatimService.reverseGeocode(lat, lng);
+      const address = data?.display_name || 'Ubicación seleccionada';
       
       const locationData = { lat, lng, address };
 
       if (activeField === 'pickup') {
         setPickupLocation(locationData);
-        setActiveField('destination'); // Pasar automáticamente al siguiente campo
+        // No avanzar automáticamente, permitir confirmar en la UI
       } else {
         setDestination(locationData);
-        setActiveField(null); // Terminar selección
+        // No avanzar automáticamente
       }
     } catch (err) {
       console.error("Error al obtener dirección:", err);
-    }
-  };
-
-  const handleInputChange = (field, value) => {
-    setAddressInput(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Buscar dirección por texto (al presionar Enter o botón buscar)
-  const searchAddress = async (field) => {
-    const query = addressInput[field];
-    if (!query) return;
-
-    setIsSearching(true);
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
-      const data = await response.json();
-      
-      if (data && data.length > 0) {
-        const { lat, lon, display_name } = data[0];
-        const newPos = { lat: parseFloat(lat), lng: parseFloat(lon), address: display_name };
-        
-        if (field === 'pickup') {
-          setPickupLocation(newPos);
-          setMapCenter(newPos);
-          setActiveField('destination');
-        } else {
-          setDestination(newPos);
-          setMapCenter(newPos);
-          setActiveField(null);
-        }
-      } else {
-        alert("Dirección no encontrada");
-      }
-    } catch (err) {
-      console.error("Error buscando dirección:", err);
-    } finally {
-      setIsSearching(false);
+      toast.error("Error al obtener la dirección");
     }
   };
 
   const handleResetInputs = () => {
-      setShowInputs(false);
-      setDestination(null);
-      setAddressInput(prev => ({ ...prev, destination: '' }));
-      if (userLocation) {
-          setPickupLocation(userLocation);
-          // El useEffect se encargará de obtener la dirección si falta
-      }
+      setSelectionStep('initial');
       setActiveField(null);
+      setPickupLocation(userLocation); // Reset to user location or null? Keep user location as default pickup.
+      setDestination(null);
+      setAddressInput({ pickup: userLocation?.address || '', destination: '' });
+      setRoute([]);
   };
 
   return (
@@ -370,6 +363,11 @@ const Dashboard = ({ user }) => {
         <MapContainer 
           center={[mapCenter.lat, mapCenter.lng]} 
           zoom={15} 
+          minZoom={6}
+          maxBounds={[
+            [0.6, -73.5], // South West (Venezuela)
+            [12.5, -59.5] // North East (Venezuela)
+          ]}
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
@@ -435,96 +433,170 @@ const Dashboard = ({ user }) => {
                borderRadius: '30px 30px 0 0', 
                backgroundColor: 'rgba(255, 255, 255, 0.95)',
                maxWidth: '600px',
-               pointerEvents: 'auto'
+               pointerEvents: 'auto',
+               transition: 'all 0.3s ease'
              }}
            >
              {!activeTrip ? (
                  <div className="animate__animated animate__fadeInUp">
                    
-                   {!showInputs ? (
-                      <div key="selection-mode" className="d-grid gap-3">
+                   {/* STEP 0: INITIAL */}
+                   {selectionStep === 'initial' && (
+                      <div key="initial-mode" className="d-grid gap-3">
                           <h5 className="mb-2 fw-bold text-dark">¿A dónde quieres ir hoy?</h5>
                           <button 
                              className="btn btn-dark btn-lg py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 w-100 rounded-4"
                              onClick={() => {
-                                 setShowInputs(true);
-                                 if (pickupLocation) {
-                                     setActiveField('destination');
-                                 } else {
-                                     setActiveField('pickup');
+                                 setSelectionStep('pickup');
+                                 setActiveField('pickup');
+                                 // Ensure pickup is set to current location if available
+                                 if (userLocation && !pickupLocation) {
+                                     setPickupLocation(userLocation);
                                  }
                              }}
                           >
                               <FaSearch />
-                              Seleccionar Destino
+                              Empezar Viaje
                           </button>
                       </div>
-                   ) : (
-                    <div key="input-mode">
-                       {/* Ocultar encabezado e inputs si ya se seleccionaron ambos puntos */}
-                       {(!pickupLocation || !destination) && (
-                         <>
-                           <div className="d-flex align-items-center justify-content-between mb-3">
-                               <h5 className="mb-0 fw-bold text-dark">Planifica tu viaje</h5>
-                               <button className="btn btn-sm btn-close" onClick={handleResetInputs}></button>
-                           </div>
+                   )}
 
-                           {/* Input Recogida */}
-                           <div className={`input-group mb-3 ${activeField === 'pickup' ? 'border border-primary rounded-3' : ''}`}>
-                             <span className="input-group-text bg-white border-end-0">
-                               <FaMapMarkerAlt className="text-primary" />
-                             </span>
-                             <input 
-                               type="text" 
-                               className="form-control border-start-0" 
-                               placeholder="Dirección de recogida"
-                               value={addressInput.pickup}
-                               onChange={(e) => handleInputChange('pickup', e.target.value)}
-                               onFocus={() => setActiveField('pickup')}
-                               onKeyDown={(e) => e.key === 'Enter' && searchAddress('pickup')}
-                             />
-                             {activeField === 'pickup' && (
-                                 <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('pickup')}>
-                                     <FaSearch />
-                                 </button>
-                             )}
-                           </div>
-        
-                           {/* Input Destino */}
-                           <div className={`input-group mb-4 ${activeField === 'destination' ? 'border border-danger rounded-3' : ''}`}>
-                             <span className="input-group-text bg-white border-end-0">
-                               <FaMapMarkedAlt className="text-danger" />
-                             </span>
-                             <input 
-                               type="text" 
-                               className="form-control border-start-0" 
-                               placeholder="Dirección de destino"
-                               value={addressInput.destination}
-                               onChange={(e) => handleInputChange('destination', e.target.value)}
-                               onFocus={() => setActiveField('destination')}
-                               onKeyDown={(e) => e.key === 'Enter' && searchAddress('destination')}
-                             />
-                             {activeField === 'destination' && (
-                                 <button className="btn btn-outline-secondary border-start-0" onClick={() => searchAddress('destination')}>
-                                     <FaSearch />
-                                 </button>
-                             )}
-                           </div>
-                         </>
-                       )}
-    
-                   {/* Selección de Vehículo y Confirmación */}
-                   {pickupLocation && destination && (
-                     <div className="animate__animated animate__fadeIn">
-                       {/* Botón para volver atrás/cancelar selección */}
+                   {/* STEP 1: PICKUP */}
+                   {selectionStep === 'pickup' && (
+                    <div key="pickup-mode" className="text-start animate__animated animate__fadeIn">
                        <div className="d-flex align-items-center justify-content-between mb-3">
-                           <button className="btn btn-link text-decoration-none text-dark p-0 d-flex align-items-center gap-2" onClick={() => {
-                               setDestination(null); // Limpiar destino para volver a mostrar inputs
-                               setAddressInput(prev => ({ ...prev, destination: '' }));
-                               setActiveField('destination');
-                           }}>
-                               <FaTimes /> Cambiar destino
+                           <h5 className="mb-0 fw-bold text-dark">Punto de Recogida</h5>
+                           <button className="btn btn-sm btn-close" onClick={handleResetInputs}></button>
+                       </div>
+
+                       <div className="mb-3">
+                           <label className="form-label text-muted small fw-bold">¿Dónde te buscamos?</label>
+                           <AddressAutocomplete 
+                               placeholder="Buscar dirección de recogida..."
+                               value={addressInput.pickup}
+                               onChange={(val) => setAddressInput(prev => ({ ...prev, pickup: val }))}
+                               onSelect={(item) => {
+                                   const { lat, lon, display_name } = item;
+                                   const newPos = { lat: parseFloat(lat), lng: parseFloat(lon), address: display_name };
+                                   setPickupLocation(newPos);
+                                   setMapCenter(newPos);
+                                   setAddressInput(prev => ({ ...prev, pickup: display_name }));
+                               }}
+                               userState={userState}
+                               autoFocus={true}
+                               icon={<FaMapMarkerAlt className="text-primary" />}
+                           />
+                       </div>
+
+                       <div className="d-flex gap-2 mb-3">
+                           <button 
+                               className="btn btn-outline-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 rounded-3"
+                               onClick={() => {
+                                   if (userLocation) {
+                                       setPickupLocation(userLocation);
+                                       setMapCenter(userLocation);
+                                       setAddressInput(prev => ({ ...prev, pickup: userLocation.address || 'Ubicación actual' }));
+                                   }
+                               }}
+                           >
+                               <FaMapMarkerAlt /> Ubicación Actual
                            </button>
+                       </div>
+                       
+                       <p className="text-muted small text-center mb-3">
+                           <small>O selecciona el punto directamente en el mapa</small>
+                       </p>
+
+                       <div className="d-grid">
+                           <button 
+                               className="btn btn-primary btn-lg fw-bold rounded-4"
+                               disabled={!pickupLocation}
+                               onClick={() => {
+                                   setSelectionStep('destination');
+                                   setActiveField('destination');
+                               }}
+                           >
+                               Confirmar Recogida
+                           </button>
+                       </div>
+                    </div>
+                   )}
+
+                   {/* STEP 2: DESTINATION */}
+                   {selectionStep === 'destination' && (
+                    <div key="destination-mode" className="text-start animate__animated animate__fadeIn">
+                       <div className="d-flex align-items-center justify-content-between mb-3">
+                           <div className="d-flex align-items-center gap-2">
+                               <button className="btn btn-light btn-sm rounded-circle shadow-sm" onClick={() => {
+                                   setSelectionStep('pickup');
+                                   setActiveField('pickup');
+                               }}>
+                                   <FaTimes />
+                               </button>
+                               <h5 className="mb-0 fw-bold text-dark">¿A dónde vas?</h5>
+                           </div>
+                           <button className="btn btn-sm btn-close" onClick={handleResetInputs}></button>
+                       </div>
+
+                       <div className="mb-4">
+                           <AddressAutocomplete 
+                               placeholder="Buscar destino..."
+                               value={addressInput.destination}
+                               onChange={(val) => setAddressInput(prev => ({ ...prev, destination: val }))}
+                               onSelect={(item) => {
+                                   const { lat, lon, display_name } = item;
+                                   const newPos = { lat: parseFloat(lat), lng: parseFloat(lon), address: display_name };
+                                   setDestination(newPos);
+                                   setMapCenter(newPos);
+                                   setAddressInput(prev => ({ ...prev, destination: display_name }));
+                               }}
+                               userState={pickupState || userState} // Prioritize pickup state
+                               autoFocus={true}
+                               icon={<FaMapMarkedAlt className="text-danger" />}
+                           />
+                       </div>
+                       
+                       <p className="text-muted small text-center mb-3">
+                           <small>Puedes seleccionar el destino en el mapa</small>
+                       </p>
+
+                       <div className="d-grid">
+                           <button 
+                               className="btn btn-danger btn-lg fw-bold rounded-4"
+                               disabled={!destination}
+                               onClick={() => {
+                                   setSelectionStep('confirm');
+                                   setActiveField(null);
+                               }}
+                           >
+                               Confirmar Destino
+                           </button>
+                       </div>
+                    </div>
+                   )}
+    
+                   {/* STEP 3: CONFIRMATION & VEHICLE */}
+                   {selectionStep === 'confirm' && pickupLocation && destination && (
+                     <div className="animate__animated animate__fadeIn">
+                       <div className="d-flex align-items-center justify-content-between mb-3">
+                           <h5 className="mb-0 fw-bold text-dark">Confirmar Viaje</h5>
+                           <button className="btn btn-sm btn-close" onClick={handleResetInputs}></button>
+                       </div>
+
+                       {/* Resumen de Ruta */}
+                       <div className="bg-light p-3 rounded-4 mb-3 position-relative overflow-hidden">
+                            <div className="d-flex align-items-center gap-3 mb-2" onClick={() => {setSelectionStep('pickup'); setActiveField('pickup');}} style={{cursor: 'pointer'}}>
+                                <FaMapMarkerAlt className="text-primary flex-shrink-0" />
+                                <div className="text-truncate fw-bold text-dark small w-100 text-start">{addressInput.pickup}</div>
+                            </div>
+                            <div className="border-start border-2 border-secondary ms-2 ps-3 py-1" style={{ height: '10px', marginLeft: '6px' }}></div>
+                            <div className="d-flex align-items-center gap-3" onClick={() => {setSelectionStep('destination'); setActiveField('destination');}} style={{cursor: 'pointer'}}>
+                                <FaMapMarkedAlt className="text-danger flex-shrink-0" />
+                                <div className="text-truncate fw-bold text-dark small w-100 text-start">{addressInput.destination}</div>
+                            </div>
+                            <div className="position-absolute top-0 end-0 p-2">
+                                <button className="btn btn-sm btn-link text-decoration-none" onClick={() => {setSelectionStep('pickup'); setActiveField('pickup');}}>Editar</button>
+                            </div>
                        </div>
 
                        <h6 className="fw-bold text-start mb-3 text-dark">Elige tu vehículo:</h6>
@@ -603,13 +675,7 @@ const Dashboard = ({ user }) => {
                      </div>
                    )}
                        
-                       {(!pickupLocation || !destination) && (
-                           <p className="text-muted small mb-0 mt-2">
-                             <small>Selecciona los puntos en el mapa o escribe la dirección.</small>
-                           </p>
-                       )}
-                    </div>
-                   )}
+                   {/* Fallback instructions removed as flow is now guided */}
                  </div>
              ) : (
                 // Vista de Viaje Activo (simplificada para encajar en el nuevo layout)
@@ -626,9 +692,19 @@ const Dashboard = ({ user }) => {
                         
                         <button
                             className="btn btn-outline-danger w-100 py-2 fw-bold"
-                            onClick={async () => {
-                                await handleCancelTrip();
-                                handleResetInputs();
+                            onClick={() => {
+                                setConfirmModal({
+                                    isOpen: true,
+                                    title: "Cancelar Solicitud",
+                                    message: "¿Estás seguro de que deseas cancelar tu solicitud de taxi?",
+                                    variant: 'danger',
+                                    confirmText: 'Sí, cancelar',
+                                    onConfirm: async () => {
+                                        closeConfirmModal();
+                                        await handleCancelTrip();
+                                        handleResetInputs();
+                                    }
+                                });
                             }}
                         >
                             Cancelar
@@ -707,6 +783,17 @@ const Dashboard = ({ user }) => {
         </main>
       </div>
 
+
+      {/* Modal de Confirmación */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText || "Confirmar"}
+      />
 
       {/* Modal de Completar Perfil - Bloqueante */}
       {showProfileModal && (
